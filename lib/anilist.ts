@@ -27,6 +27,7 @@ interface AniListDate {
 interface AniListMedia {
   id: number;
   isAdult: boolean;
+  format?: string | null;
   siteUrl: string | null;
   title: { romaji: string | null; english: string | null };
   genres: string[] | null;
@@ -49,6 +50,7 @@ interface AniListMedia {
 const MEDIA_FIELDS = `
   id
   isAdult
+  format
   siteUrl
   title { romaji english }
   genres
@@ -269,6 +271,8 @@ export async function getMediaRecommendations(
     return nodes
       .map((n) => n.mediaRecommendation)
       .filter(isNonAdultMedia)
+      // Same rule as the candidate pool: series only, no novels/one-shots.
+      .filter((media) => media.format == null || media.format === "MANGA")
       .map(mapMediaToResult);
   } catch {
     return [];
@@ -281,7 +285,15 @@ export interface CandidatePoolFilters {
   chapterLength: string; // "any" | "short" | "medium" | "long"
   contentRating?: string;
   page?: number; // 1-based; bump it to pull a fresh batch instead of re-ranking round 1's leftovers
+  /** Lesser-known, highly rated titles instead of the most popular ones (FOG-4). */
+  hiddenGems?: boolean;
 }
+
+// Hidden-gem band validated in the FOG-4 spike: below this popularity a
+// score is too noisy to trust; above it the title isn't hidden.
+export const HIDDEN_GEM_BAND = { popularityMin: 2000, popularityMax: 20000, minScore: 75 } as const;
+// Known chapter counts below this are one-shots/specials, not series.
+const MIN_GEM_CHAPTERS = 3;
 
 const ARG_TYPES: Record<string, string> = {
   genre: "String",
@@ -291,6 +303,10 @@ const ARG_TYPES: Record<string, string> = {
   status_in: "[MediaStatus]",
   sort: "[MediaSort]",
   startDate_greater: "FuzzyDateInt",
+  format_in: "[MediaFormat]",
+  popularity_greater: "Int",
+  popularity_lesser: "Int",
+  averageScore_greater: "Int",
 };
 
 const CANDIDATES_PER_QUERY = 30;
@@ -344,19 +360,28 @@ export async function getCandidatePool(
   filters: CandidatePoolFilters
 ): Promise<MangaResult[]> {
   const status = anilistStatusList(filters.completionStatus);
-  const { contentRating = "any" } = filters;
+  const { contentRating = "any", hiddenGems = false } = filters;
   const page = Math.max(1, Math.floor(filters.page ?? 1));
 
   const currentYear = new Date().getFullYear();
   const recentCutoff = (currentYear - 2) * 10000 + 101; // e.g. 20240101
 
   function buildRequest(selection: string | null, recentOnly: boolean) {
-    const activeArgs = ["sort", "genre_not_in"];
+    // format_in keeps light novels and one-shots (also type MANGA on
+    // AniList) out of the pool.
+    const activeArgs = ["sort", "genre_not_in", "format_in"];
     const vars: Record<string, unknown> = {
       page,
-      sort: ["POPULARITY_DESC"],
+      sort: [hiddenGems ? "SCORE_DESC" : "POPULARITY_DESC"],
       genre_not_in: contentRating === "safe" ? ["Hentai", "Ecchi"] : ["Hentai"],
+      format_in: ["MANGA"],
     };
+    if (hiddenGems) {
+      activeArgs.push("popularity_greater", "popularity_lesser", "averageScore_greater");
+      vars.popularity_greater = HIDDEN_GEM_BAND.popularityMin;
+      vars.popularity_lesser = HIDDEN_GEM_BAND.popularityMax;
+      vars.averageScore_greater = HIDDEN_GEM_BAND.minScore;
+    }
 
     const selectedGenre = selection && isGenre(selection) ? selection : null;
     if (contentRating === "mature" && selectedGenre && selectedGenre !== "Ecchi") {
@@ -412,6 +437,10 @@ export async function getCandidatePool(
       if (!item || seen.has(item.id)) continue;
       const candidate = mapMediaToResult(item);
       if (!matchesContentRating(candidate.genres, contentRating)) continue;
+      // Score-sorted low-popularity results are crowded by one-shots and
+      // specials; one-per-franchise is applied by the caller after its
+      // own filters, so a filtered-out entry can't claim the slot.
+      if (hiddenGems && candidate.chapters !== null && candidate.chapters < MIN_GEM_CHAPTERS) continue;
       seen.add(item.id);
       merged.push(candidate);
       if (merged.length >= MAX_POOL_SIZE) return merged;

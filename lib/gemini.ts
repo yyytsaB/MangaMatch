@@ -27,6 +27,20 @@ export interface RankingFilters {
   }[];
   diverge: boolean; // if true, nudge results away from strict similarity
   customQuery: string; // free-text extra instructions from the user
+  /** Library titles the reader rated 8–10 — positive taste signal. */
+  loved?: TasteSignal[];
+  /** Library titles the reader rated 1–4 — negative taste signal. */
+  disliked?: TasteSignal[];
+}
+
+export interface TasteSignal {
+  title: string;
+  genres: string[];
+  rating: number;
+}
+
+function describeSignals(signals: TasteSignal[]): string {
+  return signals.map((s) => `"${s.title}" (${s.rating}/10; ${s.genres.join(", ") || "no genres"})`).join("; ");
 }
 
 export interface RankedPick {
@@ -83,9 +97,23 @@ export function buildPrompt(
     );
   }
 
+  if (filters.loved && filters.loved.length > 0) {
+    parts.push(
+      `The reader rated these highly: ${describeSignals(filters.loved)}. ` +
+        "Treat them as strong evidence of their taste and favor candidates that share their appeal."
+    );
+  }
+  if (filters.disliked && filters.disliked.length > 0) {
+    parts.push(
+      `The reader rated these poorly: ${describeSignals(filters.disliked)}. ` +
+        "Avoid candidates that closely resemble them in premise, tone, or tropes."
+    );
+  }
+
   if (filters.diverge) {
     parts.push(
-      "Diverge mode is ON: prefer creative or underappreciated hidden gems that still honor the requested themes."
+      "Diverge mode is ON: these candidates are lesser-known, highly rated titles. " +
+        "Prefer creative or underappreciated hidden gems that still honor the requested themes, and say what makes each one worth discovering."
     );
   } else {
     parts.push(

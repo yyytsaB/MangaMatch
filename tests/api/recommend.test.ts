@@ -3,12 +3,16 @@ import { NextRequest } from "next/server";
 import type { MangaResult } from "@/lib/anilist";
 
 const findMany = vi.fn();
+const findDismissed = vi.fn();
 const getCandidatePool = vi.fn();
 const getMediaRecommendations = vi.fn();
 const rankCandidates = vi.fn();
 
 vi.mock("@/lib/db", () => ({
-  prisma: { manga: { findMany: (a: unknown) => findMany(a) } },
+  prisma: {
+    manga: { findMany: (a: unknown) => findMany(a) },
+    dismissedManga: { findMany: (a: unknown) => findDismissed(a) },
+  },
 }));
 vi.mock("@/lib/anilist", () => ({
   getCandidatePool: (f: unknown) => getCandidatePool(f),
@@ -49,6 +53,7 @@ function request(body: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   findMany.mockResolvedValue([]);
+  findDismissed.mockResolvedValue([]);
   getCandidatePool.mockResolvedValue([manga()]);
   getMediaRecommendations.mockResolvedValue([]);
   rankCandidates.mockResolvedValue([{ index: 0, reason: "Great fit" }]);
@@ -57,7 +62,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  for (const m of [findMany, getCandidatePool, getMediaRecommendations, rankCandidates]) {
+  for (const m of [findMany, findDismissed, getCandidatePool, getMediaRecommendations, rankCandidates]) {
     m.mockReset();
   }
 });
@@ -132,6 +137,7 @@ describe("POST /api/recommend", () => {
       chapterLength: "any",
       contentRating: "any",
       page: 1,
+      hiddenGems: false,
     });
     expect(rankCandidates.mock.calls[0][1]).toEqual({
       genres: [],
@@ -141,6 +147,8 @@ describe("POST /api/recommend", () => {
       baseManga: [],
       diverge: false,
       customQuery: "",
+      loved: [],
+      disliked: [],
     });
   });
 
@@ -228,7 +236,11 @@ describe("POST /api/recommend", () => {
     expect(
       rankCandidates.mock.calls[0][0].map((c: { title: string }) => c.title)
     ).toEqual(["Old title"]);
-    expect(findMany).toHaveBeenCalledWith({ where: { sessionId: "default" }, select: { anilistId: true } });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { sessionId: "default" },
+      select: { anilistId: true, title: true, genres: true, rating: true },
+      orderBy: { updatedAt: "desc" },
+    });
   });
 
   it("excludes ids the client has already seen", async () => {
@@ -336,6 +348,140 @@ describe("POST /api/recommend", () => {
     expect(rankCandidates.mock.calls[0][1]).toMatchObject({
       diverge: true,
       customQuery: "no isekai",
+    });
+  });
+
+  describe("taste profile", () => {
+    const shelf = [
+      { anilistId: 501, title: "Monster", genres: "Mystery, Drama", rating: 10 },
+      { anilistId: 502, title: "Pluto", genres: "Sci-Fi", rating: 9 },
+      { anilistId: 503, title: "Ok Read", genres: "Action", rating: 7 },
+      { anilistId: 504, title: "Unrated", genres: "Action", rating: null },
+      { anilistId: 505, title: "Meh", genres: "Comedy", rating: 4 },
+      { anilistId: 506, title: "Awful", genres: "Harem, Comedy", rating: 1 },
+      { anilistId: 507, title: "Good", genres: "Drama", rating: 8 },
+    ];
+
+    it("feeds 8-10 rated titles as loved and 1-4 rated titles as disliked", async () => {
+      findMany.mockResolvedValue(shelf);
+
+      await POST(request());
+
+      const { loved, disliked } = rankCandidates.mock.calls[0][1];
+      expect(loved).toEqual([
+        { title: "Monster", genres: ["Mystery", "Drama"], rating: 10 },
+        { title: "Pluto", genres: ["Sci-Fi"], rating: 9 },
+        { title: "Good", genres: ["Drama"], rating: 8 },
+      ]);
+      expect(disliked).toEqual([
+        { title: "Awful", genres: ["Harem", "Comedy"], rating: 1 },
+        { title: "Meh", genres: ["Comedy"], rating: 4 },
+      ]);
+    });
+
+    it("caps taste signals so the prompt stays bounded", async () => {
+      findMany.mockResolvedValue(Array.from({ length: 30 }, (_, i) => ({
+        anilistId: 600 + i, title: `T${i}`, genres: "Drama", rating: i % 2 ? 9 : 2,
+      })));
+
+      await POST(request());
+
+      const { loved, disliked } = rankCandidates.mock.calls[0][1];
+      expect(loved).toHaveLength(8);
+      expect(disliked).toHaveLength(5);
+    });
+
+    it("pulls community picks for the two favourite titles when no anchor is chosen", async () => {
+      findMany.mockResolvedValue(shelf);
+      getMediaRecommendations.mockImplementation(async (id: number) =>
+        id === 501 ? [manga({ anilistId: 90, genres: ["Mystery"] })] : [manga({ anilistId: 91, genres: ["Sci-Fi"] })]
+      );
+      getCandidatePool.mockResolvedValue([manga({ anilistId: 1 })]);
+
+      await POST(request());
+
+      expect(getMediaRecommendations.mock.calls.map(([id]) => id)).toEqual([501, 502]);
+      expect(rankCandidates.mock.calls[0][0].map((c: MangaResult) => c.anilistId)).toEqual([90, 91, 1]);
+    });
+
+    it("keeps favourite-derived picks inside the requested genres", async () => {
+      findMany.mockResolvedValue(shelf);
+      getMediaRecommendations.mockImplementation(async (id: number) =>
+        id === 501 ? [manga({ anilistId: 90, genres: ["Mystery"] })] : [manga({ anilistId: 91, genres: ["Sci-Fi"] })]
+      );
+      getCandidatePool.mockResolvedValue([manga({ anilistId: 1, genres: ["Mystery"] })]);
+
+      await POST(request({ genres: ["Mystery"] }));
+
+      expect(rankCandidates.mock.calls[0][0].map((c: MangaResult) => c.anilistId)).toEqual([90, 1]);
+    });
+
+    it("uses explicit anchors instead of favourites for community picks", async () => {
+      findMany
+        .mockResolvedValueOnce([{ id: 3, anilistId: 999, title: "Anchor", genres: "", synopsis: null }])
+        .mockResolvedValueOnce(shelf);
+
+      await POST(request({ baseMangaIds: [3] }));
+
+      expect(getMediaRecommendations.mock.calls.map(([id]) => id)).toEqual([999]);
+    });
+  });
+
+  it("still recommends if the dismissed-titles lookup fails (e.g. table not migrated yet)", async () => {
+    findDismissed.mockRejectedValue(new Error("no such table: DismissedManga"));
+
+    const res = await POST(request());
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).recommendations).toHaveLength(1);
+  });
+
+  it("never re-suggests titles this session dismissed", async () => {
+    findDismissed.mockResolvedValue([{ anilistId: 2 }]);
+    getCandidatePool.mockResolvedValue([manga({ anilistId: 1 }), manga({ anilistId: 2 })]);
+
+    await POST(request());
+
+    expect(findDismissed).toHaveBeenCalledWith({ where: { sessionId: "default" }, select: { anilistId: true } });
+    expect(rankCandidates.mock.calls[0][0].map((c: MangaResult) => c.anilistId)).toEqual([1]);
+  });
+
+  describe("diverge", () => {
+    it("draws from hidden gems without similarity-based community picks", async () => {
+      findMany
+        .mockResolvedValueOnce([{ id: 3, anilistId: 999, title: "Anchor", genres: "", synopsis: null }])
+        .mockResolvedValueOnce([{ anilistId: 501, title: "Monster", genres: "Mystery", rating: 10 }]);
+
+      await POST(request({ diverge: true, baseMangaIds: [3] }));
+
+      expect(getCandidatePool).toHaveBeenCalledWith(expect.objectContaining({ hiddenGems: true }));
+      expect(getMediaRecommendations).not.toHaveBeenCalled();
+      expect(rankCandidates.mock.calls[0][1].baseManga).toHaveLength(1);
+    });
+
+    it("keeps one gem per franchise, choosing among titles that pass the filters", async () => {
+      getCandidatePool.mockResolvedValue([
+        manga({ anilistId: 1, title: "Umineko When They Cry Episode 8", chapters: 200 }),
+        manga({ anilistId: 2, title: "Umineko When They Cry Episode 7", chapters: 40 }),
+        manga({ anilistId: 3, title: "Umineko When They Cry Episode 6", chapters: 30 }),
+        manga({ anilistId: 4, title: "Medalist", chapters: 50 }),
+      ]);
+
+      await POST(request({ diverge: true, chapterLength: "short" }));
+
+      expect(rankCandidates.mock.calls[0][0].map((c: MangaResult) => c.anilistId)).toEqual([2, 4]);
+    });
+
+    it("skips gems from franchises already on the shelf", async () => {
+      findMany.mockResolvedValue([{ anilistId: 1001, title: "Vagabond", genres: "Action", rating: 9 }]);
+      getCandidatePool.mockResolvedValue([
+        manga({ anilistId: 1, title: "Vagabond: Saigo no Manga-ten" }),
+        manga({ anilistId: 2, title: "Medalist" }),
+      ]);
+
+      await POST(request({ diverge: true }));
+
+      expect(rankCandidates.mock.calls[0][0].map((c: MangaResult) => c.title)).toEqual(["Medalist"]);
     });
   });
 

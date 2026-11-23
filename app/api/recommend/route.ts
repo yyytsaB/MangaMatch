@@ -3,7 +3,7 @@
 // from that real list using genre/chapter-length/base-manga similarity
 // as soft preferences.
 import { NextRequest, NextResponse } from "next/server";
-import { rankCandidates, type CandidateManga } from "@/lib/gemini";
+import { rankCandidates, type CandidateManga, type TasteSignal } from "@/lib/gemini";
 import {
   getCandidatePool,
   getMediaRecommendations,
@@ -11,7 +11,7 @@ import {
 } from "@/lib/anilist";
 import { prisma } from "@/lib/db";
 import { badRequest, serverError } from "@/lib/api";
-import { parseList } from "@/lib/manga";
+import { franchiseKey, parseList } from "@/lib/manga";
 import {
   CHAPTER_LENGTH_OPTIONS,
   COMPLETION_STATUS_OPTIONS,
@@ -29,6 +29,31 @@ import {
   parseStringArray,
   readJsonBody,
 } from "@/lib/validation";
+
+// Taste signals from the reader's own ratings (Slice 3A).
+const LOVED_MIN_RATING = 8;
+const DISLIKED_MAX_RATING = 4;
+const MAX_LOVED = 8;
+const MAX_DISLIKED = 5;
+const MAX_FAVOURITE_SEEDS = 2; // community-rec lookups per request
+
+type LibraryRow = { anilistId: number; title: string; genres: string | null; rating: number | null };
+
+function tasteSignals(library: LibraryRow[]) {
+  const toSignal = (m: LibraryRow & { rating: number }): TasteSignal => ({
+    title: m.title,
+    genres: parseList(m.genres),
+    rating: m.rating,
+  });
+  const rated = library.filter((m): m is LibraryRow & { rating: number } => typeof m.rating === "number");
+  const loved = rated.filter((m) => m.rating >= LOVED_MIN_RATING).sort((a, b) => b.rating - a.rating);
+  const disliked = rated.filter((m) => m.rating <= DISLIKED_MAX_RATING).sort((a, b) => a.rating - b.rating);
+  return {
+    lovedRows: loved,
+    loved: loved.slice(0, MAX_LOVED).map(toSignal),
+    disliked: disliked.slice(0, MAX_DISLIKED).map(toSignal),
+  };
+}
 
 export async function POST(req: NextRequest) {
   const body = await readJsonBody(req);
@@ -72,23 +97,53 @@ export async function POST(req: NextRequest) {
       baseMangaAnilistIds = mangaList.map((manga) => manga.anilistId);
     }
 
-    const libraryManga = await prisma.manga.findMany({
-      where: { sessionId },
-      select: { anilistId: true },
-    });
-    const seen = new Set([...excludeAnilistIds, ...libraryManga.map((manga) => manga.anilistId)]);
-
-    const [rawPool, communityLists] = await Promise.all([
-      getCandidatePool({ genres, completionStatus, chapterLength, contentRating, page }),
-      Promise.all(baseMangaAnilistIds.slice(0, 2).map((id) => getMediaRecommendations(id))),
+    const [libraryManga, dismissed] = await Promise.all([
+      prisma.manga.findMany({
+        where: { sessionId },
+        select: { anilistId: true, title: true, genres: true, rating: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      // Dismissals improve picks but must never block them (e.g. before
+      // the DismissedManga migration reaches a deployment).
+      prisma.dismissedManga.findMany({ where: { sessionId }, select: { anilistId: true } }).catch((err: unknown) => {
+        console.error("Dismissed titles lookup failed:", err);
+        return [] as { anilistId: number }[];
+      }),
     ]);
+    const library: LibraryRow[] = libraryManga;
+    const seen = new Set([
+      ...excludeAnilistIds,
+      ...library.map((manga) => manga.anilistId),
+      ...dismissed.map((entry) => entry.anilistId),
+    ]);
+    const { lovedRows, loved, disliked } = tasteSignals(library);
+
+    // Similarity seeds: explicit anchors win; otherwise the reader's
+    // favourites. Diverge mode skips similarity and digs for hidden gems.
+    const favouriteSeeds = baseMangaAnilistIds.length === 0
+      ? lovedRows.slice(0, MAX_FAVOURITE_SEEDS).map((m) => m.anilistId)
+      : [];
+    const [rawPool, anchorLists, favouriteLists] = await Promise.all([
+      getCandidatePool({ genres, completionStatus, chapterLength, contentRating, page, hiddenGems: diverge }),
+      diverge ? [] : Promise.all(baseMangaAnilistIds.slice(0, 2).map((id) => getMediaRecommendations(id))),
+      diverge ? [] : Promise.all(favouriteSeeds.map((id) => getMediaRecommendations(id))),
+    ]);
+    const inRequestedGenres = (manga: MangaResult) =>
+      genres.length === 0 || manga.genres.some((genre) => genres.includes(genre));
+    // Diverge: one gem per franchise, and none from franchises already shelved.
+    const franchises = new Set(library.map((manga) => franchiseKey(manga.title)));
 
     const topPool: MangaResult[] = [];
-    for (const manga of [...communityLists.flat(), ...rawPool]) {
+    for (const manga of [...anchorLists.flat(), ...favouriteLists.flat().filter(inRequestedGenres), ...rawPool]) {
       if (seen.has(manga.anilistId) ||
           !matchesCompletionStatus(manga.status, completionStatus) ||
           !matchesChapterLength(manga.chapters, chapterLength) ||
           !matchesContentRating(manga.genres, contentRating)) continue;
+      if (diverge) {
+        const franchise = franchiseKey(manga.title);
+        if (franchises.has(franchise)) continue;
+        franchises.add(franchise);
+      }
       seen.add(manga.anilistId);
       topPool.push(manga);
       if (topPool.length === 25) break;
@@ -122,6 +177,8 @@ export async function POST(req: NextRequest) {
       baseManga,
       diverge,
       customQuery,
+      loved,
+      disliked,
     });
 
     const recommendations = picks.slice(0, 5).map((pick) => {

@@ -97,7 +97,13 @@ Execute `DESIGN.md` (approved via `FOG-2`) systematically across the app:
 
 Confirmed execution order (`3A → 3B → 3C → 3D`, locked via `FOG-3`):
 
-- [ ] **Slice 3A — Smarter Recommendation Engine:** Auto-feed user's high-rated (8–10★) and low-rated (1–4★) titles as taste signals; real hidden-gems retrieval in `diverge` mode; persistent per-session `DismissedManga` table; 1-click *"Find Similar"* CTA on `/library/[id]`.
+- [x] **Slice 3A — Smarter Recommendation Engine:** Auto-feed user's high-rated (8–10★) and low-rated (1–4★) titles as taste signals; real hidden-gems retrieval in `diverge` mode; persistent per-session `DismissedManga` table; 1-click *"Find Similar"* CTA on `/library/[id]`.
+  - [x] Taste signals: up to 8 loved / 5 disliked titles in the ranking prompt; when no anchor is chosen, the two highest-rated titles seed AniList community picks (kept inside selected genres).
+  - [x] Hidden gems per `FOG-4` (score-sorted popularity band, `format_in: [MANGA]` on every pool query, stub + one-per-franchise guards, shelf franchises skipped).
+  - [x] `DismissedManga` model + migration `20261125000000_add_dismissed_manga`; `GET/POST/DELETE /api/dismissed` (validated, session-scoped); excluded from every pool. *Not interested* (with Undo) and *Just dismiss* both persist.
+  - [x] *Find similar* on `/library/[id]` → `/recommendations?similarTo=<id>` auto-runs anchored on that title.
+  - [x] *(Found in review)* Diverge shared a page counter with Suggest more (skipped the best gems); community picks could include novels; franchise dedup ran before route filters; `Re:`-style titles collapsed to one franchise; Undo could restore into a newer batch; toasts closed under the pointer/focus; "Just dismiss" became permanent without a way back (added **Hidden picks** with Restore); `/api/recommend` now degrades gracefully if the dismissed table is missing. All fixed with regression tests.
+  - [x] **[USER MANUAL]** Apply `prisma/migrations/20261125000000_add_dismissed_manga/migration.sql` to Turso before deploying.
 - [ ] **Slice 3B — Reading Progress & Notes:** Track `chaptersRead` with quick `+1` stepper on `"reading"` cards + personal notes field on detail page.
 - [ ] **Slice 3C — Search Pagination & External Import:** Paginated Search/Browse + debounced search + AniList username library import.
 - [ ] **Slice 3D — Optional Accounts:** Auth (Better Auth / Auth.js) with seamless "claim anonymous session library" migration.
@@ -111,7 +117,7 @@ Resolve each item before starting the slice it blocks:
 - [x] **`[DECISION] FOG-1` (Slice 1 — Resolved):** Keep `isAdult: false` everywhere (never literal adult/Hentai content). Wire `"mature"` specifically for borderline/Ecchi manga (prioritize/filter Ecchi candidates while still rejecting `Hentai`), `"safe"` to hide Ecchi/Hentai, and `"any"` for standard non-adult browsing.
 - [x] **`[DECISION] FOG-2` (Slice 2 — Resolved):** Refine and elevate the existing **Midnight Ink (`#0B1220`) + Warm Brass (`#E8C77E`)** dark editorial palette as specified in `DESIGN.md`.
 - [x] **`[DECISION] FOG-3` (Slice 3 — Resolved):** Execute Slice 3 in exact order: **`3A → 3B → 3C → 3D`**.
-- [ ] **`[SPIKE] FOG-4` (Blocks Slice 3A):** Run a quick throwaway AniList GraphQL check on `sort: SCORE_DESC` with popularity bands / deeper pages to verify candidate quality for true Hidden Gems (`diverge: true`).
+- [x] **`[SPIKE] FOG-4` (Slice 3A — Resolved 2026-11-24):** Hidden Gems are viable via `sort: SCORE_DESC` + `popularity_greater: 2000` / `popularity_lesser: 20000` + `averageScore_greater: 75`; quality holds across genres and deeper pages (e.g. *Medalist*, *Ikoku Nikki*, *Hirayasumi*, *Ping Pong*, *Space Brothers*, *Blue Giant*). Two guards are mandatory: (1) `format_in: [MANGA]` — without it light novels are ~⅔ of the band (also applied to every recommendation-pool query); (2) drop known stubs (< 3 chapters) and keep one title per franchise, skipping franchises already on the shelf (spin-off arcs like *Umineko* episodes otherwise crowd the pool).
 
 ---
 

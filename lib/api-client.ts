@@ -60,6 +60,26 @@ export async function addMangaToLibrary(
   return data.manga;
 }
 
+/** Never suggest this title to the session again. */
+export function dismissManga(anilistId: number, title?: string): Promise<unknown> {
+  return fetchJson("/api/dismissed", jsonRequest("POST", { anilistId, title }));
+}
+
+export interface DismissedTitle {
+  anilistId: number;
+  title: string | null;
+  createdAt: string;
+}
+
+export async function fetchDismissed(): Promise<DismissedTitle[]> {
+  const data = await fetchJson<{ dismissed: DismissedTitle[] }>("/api/dismissed");
+  return data.dismissed ?? [];
+}
+
+export function undismissManga(anilistId: number): Promise<unknown> {
+  return fetchJson("/api/dismissed", jsonRequest("DELETE", { anilistId }));
+}
+
 export interface ImportResult {
   success: boolean;
   mode: "merge" | "replace";

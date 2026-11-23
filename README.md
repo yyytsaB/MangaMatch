@@ -11,9 +11,9 @@ No account needed: each browser gets an anonymous session, and a starter shelf i
 ## Features
 
 - **Library** — poster grid or compact list, filters for reading status, category, and genre, in-library title search, and six sort orders. Filters, search, sort, and layout live in the URL, so Back from a title (or a shared link) returns to the exact same shelf. On phones the filters move into a slide-over drawer.
-- **Title pages** — reading status, a 1–10 rating, colour-coded categories, publication metadata, synopsis, and quick links to online readers.
+- **Title pages** — reading status, a 1–10 rating, colour-coded categories, publication metadata, synopsis, quick links to online readers, and a one-click **Find similar**.
 - **Search & browse** — title search plus Trending / Most popular / Top rated tabs with a genre filter. Titles already on your shelf show as *In library*.
-- **Recommendations** — a three-step flow: pick genres, themes, completion status, length, content rating, and free-text extra preferences; optionally anchor on favourites from your library; then get five picks, each with a *Why this matches you* rationale. Save a pick, mark it as already read (saved as *Completed*), ask for more, or ask for something different.
+- **Recommendations** — a three-step flow: pick genres, themes, completion status, length, content rating, and free-text extra preferences; optionally anchor on favourites from your library; then get five picks, each with a *Why this matches you* rationale. Your own ratings are used automatically: titles you rated 8–10 steer picks toward them, titles you rated 1–4 steer away. Save a pick, mark it as already read (saved as *Completed*), mark it *Not interested* (never suggested again — with Undo, and restorable any time from **Hidden picks**), ask for more, or ask for **something different** — lesser-known, highly rated hidden gems.
 - **Backup & restore** — export your library and categories as JSON, then import it later in *Merge & update* or *Replace library* mode.
 
 ## Tech Stack
@@ -90,7 +90,7 @@ app/
   library/[id]/page.tsx    title page (session-scoped server component)
   search/page.tsx          search + browse
   recommendations/page.tsx three-step recommendation flow
-  api/                     manga CRUD, search/browse, export/import, categories, recommend
+  api/                     manga CRUD, search/browse, export/import, categories, recommend, dismissed
 components/
   library/                 LibraryView, LibrarySidebar, LibraryToolbar, LibraryGrid, LibraryList,
                            ManageCategoriesModal, ImportLibraryModal, BackToLibraryLink
@@ -107,7 +107,7 @@ lib/
   session.ts, http.ts      anonymous session lookup, client fetch helper
   validation.ts            request validation shared by every write route
   ui.ts                    Tailwind recipes built on the design tokens
-prisma/                    schema + migrations (Manga, Category, StarterLibrary — all session-scoped)
+prisma/                    schema + migrations (Manga, Category, StarterLibrary, DismissedManga — all session-scoped)
 proxy.ts                   issues the session cookie on first visit
 tests/                     Vitest suites (api/, lib/, components/, pages/)
 e2e/                       Playwright smoke tests
@@ -115,10 +115,11 @@ e2e/                       Playwright smoke tests
 
 ## How Recommendations Work
 
-1. `getCandidatePool()` (`lib/anilist.ts`) fetches real manga that match your filters. Content rating maps to AniList genres: *Safe* excludes Ecchi, *Mature* targets Ecchi, and adult/Hentai titles are always excluded.
-2. If you anchored on favourites, AniList's community "readers also liked" recommendations for those titles go to the front of the pool.
-3. Titles already in your library, and picks you've already seen, are excluded by AniList ID.
-4. Gemini receives the numbered candidate list (with chapter counts and scores) and returns structured JSON selecting five by index, each with a short rationale. It can only rank what it was given.
+1. `getCandidatePool()` (`lib/anilist.ts`) fetches real manga (format `MANGA` only — no light novels or one-shots) that match your filters, sorted by popularity. Content rating maps to AniList genres: *Safe* excludes Ecchi, *Mature* targets Ecchi, and adult/Hentai titles are always excluded.
+2. **Something different** switches the pool to hidden gems: sorted by score within a 2,000–20,000 popularity band (score > 75), dropping stubs under 3 chapters and keeping one title per franchise, skipping franchises already on your shelf.
+3. Otherwise, AniList's community "readers also liked" picks go to the front of the pool — for the favourites you anchored on, or, if you didn't anchor, for your two highest-rated titles (kept within any genres you selected).
+4. Titles already in your library, picks you've already seen this session, and anything you marked *Not interested* are excluded by AniList ID.
+5. Gemini receives the numbered candidate list (with chapter counts and scores) plus your taste signals — up to 8 titles you rated 8–10 and 5 you rated 1–4 — and returns structured JSON selecting five by index, each with a short rationale. It can only rank what it was given.
 
 ## Known Limitations
 

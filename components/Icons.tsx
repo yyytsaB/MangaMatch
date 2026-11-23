@@ -60,4 +60,5 @@ export const HeartIcon = icon("HeartIcon", <path d="M19 14c1.49-1.46 3-3.21 3-5.
 export const AwardIcon = icon("AwardIcon", <><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></>);
 export const TargetIcon = icon("TargetIcon", <><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></>);
 export const CompassIcon = icon("CompassIcon", <><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z" /></>);
+export const EyeOffIcon = icon("EyeOffIcon", <><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" /></>);
 export const SpinnerIcon = icon("SpinnerIcon", <path d="M21 12a9 9 0 1 1-6.219-8.56" />);

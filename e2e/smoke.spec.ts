@@ -115,6 +115,37 @@ test("recommend: get picks and save one to the library", async ({ page }) => {
   await expect(page.getByText("48", { exact: true })).toBeVisible();
 });
 
+test("find similar: one click from a title, then hide a pick for good", async ({ page }) => {
+  await stubCatalogue(page);
+  await page.goto("/library");
+  await page.getByRole("link", { name: /Omniscient Reader/ }).click();
+  await expect(page).toHaveURL(/\/library\/\d+$/);
+  const mangaId = Number(page.url().split("/").pop());
+
+  const recommendRequest = page.waitForRequest("**/api/recommend");
+  await page.getByRole("link", { name: "Find similar" }).click();
+  expect((await recommendRequest).postDataJSON()).toMatchObject({ baseMangaIds: [mangaId], diverge: false });
+  await expect(page.getByRole("heading", { name: "Smoke Test Pick" })).toBeVisible();
+  await expect(page.getByText(/Anchored on Omniscient Reader/)).toBeVisible();
+  await expect(page).toHaveURL(/\/recommendations$/);
+
+  await page.getByRole("button", { name: "Not interested in Smoke Test Pick" }).click();
+  await expect(page.getByRole("heading", { name: "Smoke Test Pick" })).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("won’t suggest");
+
+  // Persisted for this session on the server, so it's excluded from future pools.
+  const dismissed = await (await page.request.get("/api/dismissed")).json();
+  expect(dismissed.dismissed.map((d: { anilistId: number }) => d.anilistId)).toContain(990003);
+
+  // And it can be restored later from Hidden picks.
+  await page.getByRole("button", { name: "Hidden picks" }).click();
+  const hidden = page.getByRole("dialog", { name: "Hidden picks" });
+  await hidden.getByRole("button", { name: "Restore Smoke Test Pick" }).click();
+  await expect(hidden.getByText("Nothing hidden yet.")).toBeVisible();
+  const after = await (await page.request.get("/api/dismissed")).json();
+  expect(after.dismissed).toEqual([]);
+});
+
 test("backup: export, remove a title, then import it back", async ({ page }, testInfo) => {
   await page.goto("/library");
   await expect(page.getByRole("link", { name: /Omniscient Reader/ })).toBeVisible();

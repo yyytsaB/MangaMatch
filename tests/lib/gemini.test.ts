@@ -283,6 +283,33 @@ describe("rankCandidates prompt building", () => {
     expect(prompt).toContain("Additional user instructions: no isekai please");
   });
 
+  it("feeds high- and low-rated library titles in as taste signals", async () => {
+    await rankCandidates([candidate()], filters({
+      loved: [{ title: "Monster", genres: ["Mystery", "Psychological"], rating: 10 }],
+      disliked: [{ title: "Loud Harem Comedy", genres: ["Comedy", "Harem"], rating: 2 }],
+    }));
+
+    const prompt = sentPrompt();
+    expect(prompt).toContain('"Monster" (10/10; Mystery, Psychological)');
+    expect(prompt).toMatch(/rated these highly/i);
+    expect(prompt).toContain('"Loud Harem Comedy" (2/10; Comedy, Harem)');
+    expect(prompt).toMatch(/avoid candidates that closely resemble/i);
+  });
+
+  it("omits taste lines when the reader has no strong ratings", async () => {
+    await rankCandidates([candidate()], filters({ loved: [], disliked: [] }));
+
+    const prompt = sentPrompt();
+    expect(prompt).not.toMatch(/rated these highly/i);
+    expect(prompt).not.toMatch(/closely resemble/i);
+  });
+
+  it("explains that diverge candidates are lesser-known gems", async () => {
+    await rankCandidates([candidate()], filters({ diverge: true }));
+
+    expect(sentPrompt()).toMatch(/lesser-known, highly rated/i);
+  });
+
   it("ignores a whitespace-only custom query", async () => {
     await rankCandidates([candidate()], filters({ customQuery: "   " }));
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import CategoryManager from "@/components/CategoryManager";
@@ -8,7 +9,7 @@ import CoverImage from "@/components/CoverImage";
 import Chip from "@/components/Chip";
 import StatusBadge from "@/components/StatusBadge";
 import BackToLibraryLink from "@/components/library/BackToLibraryLink";
-import { ExternalLinkIcon, StarIcon } from "@/components/Icons";
+import { ExternalLinkIcon, SparklesIcon, StarIcon } from "@/components/Icons";
 import { parseList } from "@/lib/manga";
 import { readerUrl } from "@/lib/reader-links";
 import { getSessionId } from "@/lib/session";
@@ -121,6 +122,10 @@ export default async function MangaDetailPage({
             <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-paper sm:text-[2.25rem]">
               {manga.title}
             </h1>
+            <Link href={`/recommendations?similarTo=${manga.id}`} className={cn(buttonClass("primary", "md"), "mt-4")}>
+              <SparklesIcon />
+              Find similar
+            </Link>
           </header>
 
           <section aria-label="Your progress" className={cn(PANEL, "grid gap-6 p-5 md:grid-cols-2")}>

@@ -19,6 +19,7 @@ export default function RecommendationResults({
   onDiverge,
   onSave,
   onAlreadyRead,
+  onNotInterested,
 }: {
   recommendations: Recommendation[];
   anchors: SavedManga[];
@@ -31,6 +32,7 @@ export default function RecommendationResults({
   onDiverge: () => void;
   onSave: (rec: Recommendation) => void;
   onAlreadyRead: (rec: Recommendation) => void;
+  onNotInterested: (rec: Recommendation) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -73,6 +75,7 @@ export default function RecommendationResults({
                 isAdded={addedIds.has(rec.anilistId)}
                 onSave={onSave}
                 onAlreadyRead={onAlreadyRead}
+                onNotInterested={onNotInterested}
               />
             </li>
           ))}

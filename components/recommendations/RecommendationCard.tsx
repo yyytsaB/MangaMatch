@@ -1,7 +1,7 @@
 import Chip from "@/components/Chip";
 import CoverImage from "@/components/CoverImage";
 import StatusBadge from "@/components/StatusBadge";
-import { BookOpenIcon, CheckIcon, ExternalLinkIcon, PlusIcon } from "@/components/Icons";
+import { BookOpenIcon, CheckIcon, ExternalLinkIcon, PlusIcon, XIcon } from "@/components/Icons";
 import { readerUrl } from "@/lib/reader-links";
 import type { Recommendation } from "@/lib/types";
 import { COUNT, LABEL, buttonClass, cn } from "@/lib/ui";
@@ -11,11 +11,13 @@ export default function RecommendationCard({
   isAdded,
   onSave,
   onAlreadyRead,
+  onNotInterested,
 }: {
   rec: Recommendation;
   isAdded: boolean;
   onSave: (rec: Recommendation) => void;
   onAlreadyRead: (rec: Recommendation) => void;
+  onNotInterested: (rec: Recommendation) => void;
 }) {
   return (
     <article className="flex gap-4 rounded-xl border border-hairline bg-shelf p-4 transition-[border-color] duration-150 ease-snap hover:border-hairline-strong sm:gap-5 sm:p-5">
@@ -61,6 +63,15 @@ export default function RecommendationCard({
           </button>
           <button type="button" onClick={() => onAlreadyRead(rec)} className={buttonClass("secondary", "sm")}>
             Already read
+          </button>
+          <button
+            type="button"
+            onClick={() => onNotInterested(rec)}
+            aria-label={`Not interested in ${rec.title}`}
+            className={buttonClass("ghost", "sm")}
+          >
+            <XIcon size={14} />
+            Not interested
           </button>
 
           <div className="ml-auto flex items-center gap-1">

@@ -267,6 +267,21 @@ describe("getMediaRecommendations", () => {
     expect(results.map((r) => r.anilistId)).toEqual([1]);
   });
 
+  it("keeps only real manga series out of community recommendations", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      data: { Media: { recommendations: { nodes: [
+        { mediaRecommendation: mediaFixture({ id: 1, format: "MANGA" }) },
+        { mediaRecommendation: mediaFixture({ id: 2, format: "NOVEL" }) },
+        { mediaRecommendation: mediaFixture({ id: 3, format: "ONE_SHOT" }) },
+      ] } } },
+    }));
+
+    const results = await getMediaRecommendations(30002);
+    expect(results.map((r) => r.anilistId)).toEqual([1]);
+    const sentQuery: string = JSON.parse(String(fetchMock.mock.calls[0][1].body)).query;
+    expect(sentQuery.split(/\s+/)).toContain("format");
+  });
+
   it("returns an empty list when the media has no recommendations", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: { Media: null } }));
     expect(await getMediaRecommendations(1)).toEqual([]);
@@ -413,5 +428,56 @@ describe("getCandidatePool", () => {
     const results = await getCandidatePool(baseFilters);
 
     expect(results.map((r) => r.anilistId)).toEqual([1]);
+  });
+
+  it("only pools real manga (no light novels or one-shots)", async () => {
+    await getCandidatePool(baseFilters);
+    for (const call of calls) {
+      expect(call.variables.format_in).toEqual(["MANGA"]);
+      expect(call.query).toContain("$format_in: [MediaFormat]");
+    }
+  });
+
+  describe("hidden gems", () => {
+    const gemFilters = { ...baseFilters, hiddenGems: true };
+
+    it("ranks by score inside the lesser-known popularity band", async () => {
+      await getCandidatePool(gemFilters);
+
+      expect(calls.length).toBeGreaterThan(0);
+      for (const call of calls) {
+        expect(call.variables).toMatchObject({
+          sort: ["SCORE_DESC"],
+          popularity_greater: 2000,
+          popularity_lesser: 20000,
+          averageScore_greater: 75,
+          format_in: ["MANGA"],
+          genre: "Action",
+        });
+        expect(call.query).toContain("$popularity_greater: Int");
+        expect(call.query).toContain("$averageScore_greater: Int");
+      }
+    });
+
+    it("keeps the normal popularity pool unchanged when off", async () => {
+      await getCandidatePool(baseFilters);
+      for (const call of calls) {
+        expect(call.variables.sort).toEqual(["POPULARITY_DESC"]);
+        expect(call.variables).not.toHaveProperty("popularity_lesser");
+      }
+    });
+
+    it("drops known stubs but keeps unknown chapter counts (franchise dedup happens after route filters)", async () => {
+      fetchMock.mockResolvedValue(pageResponse([
+        mediaFixture({ id: 1, title: { english: "Umineko When They Cry Episode 8: Twilight", romaji: null }, chapters: 42 }),
+        mediaFixture({ id: 2, title: { english: "Umineko When They Cry Episode 7: Requiem", romaji: null }, chapters: 48 }),
+        mediaFixture({ id: 3, title: { english: "Vagabond: Saigo no Manga-ten", romaji: null }, chapters: 2 }),
+        mediaFixture({ id: 4, title: { english: "Medalist", romaji: null }, chapters: null }),
+      ]));
+
+      const pool = await getCandidatePool(gemFilters);
+
+      expect(pool.map((m) => m.anilistId)).toEqual([1, 2, 4]);
+    });
   });
 });

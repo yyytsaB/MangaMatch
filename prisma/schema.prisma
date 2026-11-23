@@ -51,3 +51,15 @@ model Category {
 model StarterLibrary {
   sessionId String @id
 }
+
+// Titles a session asked never to be recommended again ("Not interested",
+// or "already read" without saving). Keyed by AniList id, like the library.
+model DismissedManga {
+  id        Int      @id @default(autoincrement())
+  sessionId String
+  anilistId Int
+  title     String?
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, anilistId]) // also serves sessionId-only lookups
+}
