@@ -1,35 +1,15 @@
-import { cn } from "@/lib/ui";
+import { POSTER_GRID, cn } from "@/lib/ui";
 
-// Bar heights/widths per skeleton line, mirroring a title + metadata rows.
-const LINES = ["h-5 w-3/4", "h-4 w-1/2", "h-4 w-full"];
-
-/** Placeholder cards shown while a grid of manga is loading. */
-export default function MangaCardSkeletons({
-  count = 3,
-  lines = 2,
-  className,
-}: {
-  count?: number;
-  lines?: number;
-  className?: string;
-}) {
+/** Placeholder posters that mirror the real poster grid, so nothing shifts. */
+export default function MangaCardSkeletons({ count = 10, className }: { count?: number; className?: string }) {
   return (
-    <div
-      className={cn(
-        "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
-        className
-      )}
-    >
+    <div className={cn(POSTER_GRID, className)} aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <div
-          key={i}
-          className="animate-pulse overflow-hidden rounded-xl border-2 border-[#1E2C42] bg-[#0F1B2E]"
-        >
-          <div className="aspect-[2/3] w-full bg-[#1E2C42]" />
-          <div className="space-y-3 p-4">
-            {LINES.slice(0, lines).map((line) => (
-              <div key={line} className={`rounded bg-[#1E2C42] ${line}`} />
-            ))}
+        <div key={i} className="overflow-hidden rounded-xl border border-hairline bg-shelf">
+          <div className="aspect-[2/3] w-full bg-elevated motion-safe:animate-pulse" />
+          <div className="space-y-2 p-3">
+            <div className="h-4 w-3/4 rounded bg-elevated motion-safe:animate-pulse" />
+            <div className="h-3 w-1/2 rounded bg-elevated motion-safe:animate-pulse" />
           </div>
         </div>
       ))}

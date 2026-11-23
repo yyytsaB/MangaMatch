@@ -3,13 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TogglePill from "@/components/TogglePill";
-import {
-  createCategory,
-  fetchCategories,
-  setMangaCategory,
-} from "@/lib/api-client";
+import { CategoryDot } from "@/components/CategoryChip";
+import { PlusIcon } from "@/components/Icons";
+import { createCategory, fetchCategories, setMangaCategory } from "@/lib/api-client";
 import type { Category } from "@/lib/types";
-import { LABEL } from "@/lib/ui";
+import { CATEGORY_COLORS, INPUT, LABEL, buttonClass, cn } from "@/lib/ui";
 
 export default function CategoryManager({
   mangaId,
@@ -22,6 +20,8 @@ export default function CategoryManager({
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -32,10 +32,12 @@ export default function CategoryManager({
 
   async function toggleCategory(category: Category) {
     setBusyId(category.id);
-
+    setToggleError(null);
     try {
       await setMangaCategory(mangaId, category.id, assignedIds.has(category.id));
       router.refresh();
+    } catch (err) {
+      setToggleError(err instanceof Error ? err.message : "Couldn’t update that category.");
     } finally {
       setBusyId(null);
     }
@@ -43,15 +45,18 @@ export default function CategoryManager({
 
   async function handleCreateCategory(e: React.FormEvent) {
     e.preventDefault();
-    if (!newName.trim()) return;
+    const name = newName.trim();
+    if (!name) return;
     setCreating(true);
+    setCreateError(null);
 
     try {
-      const category = await createCategory(newName.trim());
+      const { hex: color } = CATEGORY_COLORS[allCategories.length % CATEGORY_COLORS.length];
+      const category = await createCategory(name, color);
       setAllCategories((prev) => [...prev, category]);
       setNewName("");
-    } catch {
-      // surfaced by the empty input staying filled — nothing else to do
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Could not create that category.");
     } finally {
       setCreating(false);
     }
@@ -59,45 +64,51 @@ export default function CategoryManager({
 
   return (
     <div>
-      <p className={`mb-2 ${LABEL}`}>Categories</p>
+      <p className={cn("mb-2.5", LABEL)}>Categories</p>
 
-      {/* Category pills */}
-      <div className="mb-3 flex flex-wrap gap-1.5">
+      <div className="mb-4 flex flex-wrap gap-1.5">
         {allCategories.map((cat) => (
           <TogglePill
             key={cat.id}
             active={assignedIds.has(cat.id)}
             onClick={() => toggleCategory(cat)}
             disabled={busyId === cat.id}
-            className="px-3 py-1 text-[10px]"
           >
+            <CategoryDot color={cat.color} />
             {cat.name}
           </TogglePill>
         ))}
-        {allCategories.length === 0 && (
-          <p className="text-xs text-[#8CA0BE]">
-            No categories yet — create one below.
-          </p>
-        )}
+        {allCategories.length === 0 && <p className="text-sm text-slate">No categories yet — create one below.</p>}
       </div>
+      {toggleError && (
+        <p role="alert" className="-mt-2 mb-4 text-sm text-danger">
+          {toggleError}
+        </p>
+      )}
 
-      {/* Add category form */}
       <form onSubmit={handleCreateCategory} className="flex gap-2">
+        <label htmlFor={`new-category-${mangaId}`} className="sr-only">
+          New category name
+        </label>
         <input
+          id={`new-category-${mangaId}`}
           type="text"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="New category name..."
-          className="flex-1 rounded-full border border-[#1E2C42] bg-[#0F1B2E] px-4 py-2 text-xs text-[#F5F5F0] placeholder:text-[#8CA0BE] outline-none transition-all duration-300 focus:border-[#E8C77E]/50 focus:shadow-[0_0_15px_rgba(232,199,126,0.1)]"
+          placeholder="New category name"
+          maxLength={60}
+          className={INPUT}
         />
-        <button
-          type="submit"
-          disabled={creating}
-          className="rounded-full border border-[#E8C77E]/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#E8C77E] transition-all duration-200 hover:bg-[#E8C77E] hover:text-[#0B1220] hover:shadow-[0_0_15px_rgba(232,199,126,0.3)] disabled:opacity-50"
-        >
-          + Add
+        <button type="submit" disabled={creating || !newName.trim()} className={buttonClass("secondary", "md")}>
+          <PlusIcon />
+          Add
         </button>
       </form>
+      {createError && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {createError}
+        </p>
+      )}
     </div>
   );
 }

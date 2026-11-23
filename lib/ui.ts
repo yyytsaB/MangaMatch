@@ -1,99 +1,121 @@
-// Shared Tailwind class recipes for the recurring visual elements of the UI
-// (toggle pills, buttons, small mono labels, glassmorphic cards, and badges).
+// Shared Tailwind class recipes built on the design tokens in
+// app/globals.css. Keep visual decisions here so every page speaks the same
+// language: tonal surfaces, 1px hairlines, one brass accent, and snappy
+// transitions on explicit properties only (never `transition-all`).
 
 export function cn(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
 }
 
-/** Accent colour of an element's selected state. */
-export type Accent = "light" | "gold";
+/** Colour/border/opacity transitions plus the press-scale, 150ms ease-out. */
+const INTERACTIVE =
+  "transition-[background-color,border-color,color,opacity,scale] duration-150 ease-snap motion-safe:active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50";
 
-const ACCENT_ACTIVE: Record<Accent, string> = {
-  light: "border-[#F5F5F0] bg-[#F5F5F0] text-[#0B1220] shadow-[0_0_20px_rgba(245,245,240,0.25)]",
-  gold: "border-[#E8C77E] bg-[#E8C77E] text-[#0B1220] shadow-[0_0_20px_rgba(232,199,126,0.35)]",
+const BUTTON_BASE = cn(
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-full border font-medium whitespace-nowrap select-none",
+  INTERACTIVE
+);
+
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonSize = "sm" | "md" | "lg";
+
+const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
+  primary: "border-brass bg-brass text-ink hover:border-brass-hover hover:bg-brass-hover",
+  secondary: "border-hairline bg-shelf text-paper hover:border-hairline-strong hover:bg-elevated",
+  ghost: "border-transparent bg-transparent text-slate hover:bg-elevated hover:text-paper",
+  danger: "border-danger/35 bg-danger/10 text-danger hover:border-[#EF4444] hover:bg-[#EF4444] hover:text-white",
 };
 
-const ACCENT_IDLE: Record<Accent, string> = {
-  light:
-    "border-[#1E2C42] bg-[#0F1B2E]/60 text-[#8CA0BE] hover:border-[#F5F5F0]/40 hover:bg-[#1E2C42]/40 hover:text-[#F5F5F0]",
-  gold:
-    "border-[#1E2C42] bg-[#0F1B2E]/60 text-[#8CA0BE] hover:border-[#E8C77E]/40 hover:bg-[#E8C77E]/5 hover:text-[#E8C77E]",
+const BUTTON_SIZES: Record<ButtonSize, string> = {
+  sm: "h-8 px-3.5 text-xs",
+  md: "h-10 px-5 text-sm",
+  lg: "h-11 px-6 text-sm",
 };
 
-export function pillClass(active: boolean, accent: Accent = "light"): string {
+export function buttonClass(variant: ButtonVariant = "secondary", size: ButtonSize = "md"): string {
+  return cn(BUTTON_BASE, BUTTON_VARIANTS[variant], BUTTON_SIZES[size]);
+}
+
+/** Square icon-only control (needs an aria-label). */
+export const ICON_BUTTON = cn(
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-slate hover:bg-elevated hover:text-paper",
+  INTERACTIVE
+);
+
+/** Toggle pill (filter options, genre picks). Pair with aria-pressed. */
+export function pillClass(active: boolean): string {
   return cn(
-    "rounded-full border font-mono uppercase tracking-wide transition-all duration-200 disabled:opacity-50 active:scale-95",
-    active ? ACCENT_ACTIVE[accent] : ACCENT_IDLE[accent]
+    "inline-flex items-center gap-1.5 rounded-full border",
+    INTERACTIVE,
+    active
+      ? "border-brass/50 bg-brass/10 text-brass"
+      : "border-hairline bg-shelf text-slate hover:border-hairline-strong hover:text-paper"
   );
 }
 
-/** Non-interactive tag/chip, e.g. a genre or category label. */
-export function chipClass(accent: Accent = "gold"): string {
+/** Row button inside a filter list (sidebar statuses, genres, tags). */
+export function filterRowClass(active: boolean): string {
   return cn(
-    "inline-flex items-center gap-1.5 rounded-full border font-mono uppercase tracking-wider backdrop-blur-sm transition-colors",
-    accent === "gold"
-      ? "border-[#E8C77E]/25 bg-[#E8C77E]/10 text-[#E8C77E]"
-      : "border-[#F5F5F0]/20 bg-[#F5F5F0]/10 text-[#F5F5F0]"
+    "flex w-full min-h-9 items-center justify-between gap-3 rounded-lg px-3 py-1.5 text-left text-sm",
+    "transition-[background-color,color] duration-150 ease-snap",
+    active ? "bg-elevated text-paper" : "text-slate hover:bg-elevated/60 hover:text-paper"
   );
 }
 
-export const BUTTON_PRIMARY =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-[#E8C77E] bg-[#E8C77E] text-xs font-semibold uppercase tracking-wide text-[#0B1220] shadow-[0_4px_20px_rgba(232,199,126,0.25)] transition-all duration-300 hover:bg-[#F5F5F0] hover:border-[#F5F5F0] hover:shadow-[0_0_30px_rgba(245,245,240,0.4)] active:scale-95 disabled:opacity-50 disabled:pointer-events-none";
+/** Non-interactive tag, e.g. a genre on a card or detail page. */
+export const CHIP =
+  "inline-flex items-center gap-1.5 rounded-full border border-hairline bg-ink/40 px-2.5 py-0.5 text-xs text-slate";
 
-export const BUTTON_SECONDARY =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-[#1E2C42] bg-[#0F1B2E]/80 backdrop-blur-sm text-xs font-semibold uppercase tracking-wide text-[#8CA0BE] transition-all duration-300 hover:border-[#E8C77E]/50 hover:bg-[#1E2C42]/50 hover:text-[#F5F5F0] active:scale-95 disabled:opacity-50 disabled:pointer-events-none";
+/** Raised panel: cards, sidebars, metadata blocks. Flat by default. */
+export const PANEL = "rounded-xl border border-hairline bg-shelf";
 
-export const BUTTON_DANGER =
-  "inline-flex items-center justify-center gap-1.5 rounded-full border border-red-500/40 bg-red-500/10 font-mono text-[10px] uppercase tracking-wide text-red-400 transition-all duration-200 hover:bg-red-500 hover:text-white hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] active:scale-95 disabled:opacity-50 disabled:pointer-events-none";
+export const INPUT =
+  "h-10 w-full rounded-lg border border-hairline bg-ink px-3.5 text-sm text-paper placeholder:text-muted transition-[border-color] duration-150 ease-snap hover:border-hairline-strong focus:border-brass/70 focus-visible:outline-none";
 
-export const BUTTON_GHOST =
-  "inline-flex items-center justify-center gap-1.5 rounded-full text-xs font-mono uppercase tracking-wide text-[#8CA0BE] transition-all duration-200 hover:bg-[#1E2C42]/50 hover:text-[#F5F5F0] active:scale-95";
+/** Uppercase mono micro-label above a control or metadata value. */
+export const LABEL = "font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-slate";
 
-/** Glass card container style */
-export const CARD_SURFACE =
-  "rounded-2xl border border-[#1E2C42]/80 bg-[#0F1B2E]/70 backdrop-blur-md shadow-xl transition-all duration-300 hover:border-[#E8C77E]/40 hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)]";
+/** Mono figure for counts, scores, and ratings. */
+export const COUNT = "font-mono text-[11px] tabular-nums";
 
-/** Small mono caption above a control or metadata value. */
-export const LABEL =
-  "font-mono text-[10px] uppercase tracking-wider text-[#8CA0BE]";
+/** Exact same poster rhythm on Library, Search, and their skeletons. */
+export const POSTER_GRID = "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5";
 
-/** Status badge styles with color coding */
-export function statusBadge(status: string | null | undefined): {
-  label: string;
-  className: string;
-} {
+/** Page container shared by Nav and every route so edges align. */
+export const CONTAINER = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8";
+
+const STATUS_STYLES: Record<string, { label: string; className: string }> = {
+  reading: { label: "Reading", className: "border-reading/30 bg-reading/10 text-reading" },
+  completed: { label: "Completed", className: "border-completed/30 bg-completed/10 text-completed" },
+  finished: { label: "Completed", className: "border-completed/30 bg-completed/10 text-completed" },
+  planning: { label: "Planning", className: "border-planning/30 bg-planning/10 text-planning" },
+  releasing: { label: "Releasing", className: "border-releasing/30 bg-releasing/10 text-releasing" },
+  hiatus: { label: "Hiatus", className: "border-hiatus/30 bg-hiatus/10 text-hiatus" },
+  not_yet_released: { label: "Upcoming", className: "border-hairline bg-ink/60 text-slate" },
+  cancelled: { label: "Cancelled", className: "border-danger/30 bg-danger/10 text-danger" },
+};
+
+/** Label + tint for a reading status or an AniList publication status. */
+export function statusBadge(status: string | null | undefined): { label: string; className: string } {
   const normalized = (status ?? "unknown").toLowerCase();
-  switch (normalized) {
-    case "reading":
-      return {
-        label: "Reading",
-        className: "border-blue-400/30 bg-blue-500/10 text-blue-300",
-      };
-    case "completed":
-    case "finished":
-      return {
-        label: "Completed",
-        className: "border-emerald-400/30 bg-emerald-500/10 text-emerald-300",
-      };
-    case "planning":
-      return {
-        label: "Planning",
-        className: "border-amber-400/30 bg-amber-500/10 text-amber-300",
-      };
-    case "releasing":
-      return {
-        label: "Releasing",
-        className: "border-purple-400/30 bg-purple-500/10 text-purple-300",
-      };
-    case "hiatus":
-      return {
-        label: "Hiatus",
-        className: "border-orange-400/30 bg-orange-500/10 text-orange-300",
-      };
-    default:
-      return {
-        label: status ?? "Unknown",
-        className: "border-[#1E2C42] bg-[#1E2C42]/40 text-[#8CA0BE]",
-      };
-  }
+  return STATUS_STYLES[normalized] ?? {
+    label: status ?? "Unknown",
+    className: "border-hairline bg-ink/60 text-slate",
+  };
+}
+
+/** Swatches offered for new categories; the first is the schema default. */
+export const CATEGORY_COLORS = [
+  { name: "Brass", hex: "#E8C77E" },
+  { name: "Blue", hex: "#60A5FA" },
+  { name: "Pink", hex: "#F472B6" },
+  { name: "Green", hex: "#34D399" },
+  { name: "Violet", hex: "#A78BFA" },
+  { name: "Orange", hex: "#FB923C" },
+  { name: "Slate", hex: "#94A6C2" },
+] as const;
+
+/** Category colours come from user data; only trust well-formed hex values. */
+export function safeColor(color: string | null | undefined, fallback = "#E8C77E"): string {
+  return color && /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
 }

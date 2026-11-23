@@ -1,28 +1,28 @@
 "use client";
 
-import { cn, pillClass, type Accent } from "@/lib/ui";
+import { cn, pillClass } from "@/lib/ui";
 
-/** Rounded pill button whose selected state is filled with the accent colour. */
+/** Pressable filter pill; the pressed state is exposed to assistive tech. */
 export default function TogglePill({
   active,
   onClick,
   children,
-  accent = "light",
   disabled,
-  className = "px-3.5 py-1.5 text-xs",
+  className = "h-8 px-3.5 text-xs",
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
-  accent?: Accent;
   disabled?: boolean;
   className?: string;
 }) {
   return (
     <button
+      type="button"
+      aria-pressed={active}
       onClick={onClick}
       disabled={disabled}
-      className={cn(pillClass(active, accent), className)}
+      className={cn(pillClass(active), className)}
     >
       {children}
     </button>

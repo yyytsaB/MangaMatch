@@ -62,29 +62,31 @@ Write failing Vitest regression tests for each item before implementing:
 
 Execute `DESIGN.md` (approved via `FOG-2`) systematically across the app:
 
-- [ ] **Tokens & Anti-Slop Cleanup:**
-  - [ ] Define canonical CSS custom properties and Tailwind `@theme` tokens in `app/globals.css` and simplify `lib/ui.ts`.
-  - [ ] Remove `components/AmbientBackground.tsx` drifting glow blobs, hero stacked glows, card shimmer sweeps, neon colored box-shadows, and `backdrop-blur-xl` on near-opaque surfaces.
-  - [ ] Replace all UI emojis (`✨`, `⚙️`, `🏷️`, `🔥`, `⭐`, `📥`, `📤`, `📚`, `🎭`, `🎯`, `📖`, `📁`, `⚡`, `🔍`, `🏆`) with one unified 16px stroke SVG icon set.
-  - [ ] Rewrite vendor-leaking UI copy (`"AniList GraphQL"`, `"Gemini AI"`, `"Why Gemini picks this"`) into natural product copy (`"Why this matches you"`, `"Extra preferences"`, `"Find recommendations"`).
-- [ ] **Layout & Visual Consistency:**
-  - [ ] Standardize container width to `max-w-7xl` across `Nav.tsx` and every page route.
-  - [ ] Unify page headers (`PageHeader`), border radii (`rounded-xl` cards/panels, `rounded-lg` inputs/list items, `rounded-full` pills/buttons), and `1px` borders.
-  - [ ] Render actual stored `category.color` on category chips and filter pills instead of hardcoded blue/gold.
-  - [ ] Match `MangaCardSkeletons` grid columns (`grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5`) to the real poster grids; remove invalid utility classes (`py-0.2`).
-- [ ] **Decompose Monolithic Pages:**
-  - [ ] Split `app/library/page.tsx` (964L) into `LibrarySidebar`, `LibraryToolbar`, `LibraryGrid`, `LibraryList`, `ManageCategoriesModal`, and `ImportLibraryModal`.
-  - [ ] Split `app/recommendations/page.tsx` (713L) into `FilterStep`, `BaseMangaStep`, `RecommendationResults`, and `RecommendationCard`.
-  - [ ] Extract `MangaPosterCard` and `AddToLibraryModal` from `app/search/page.tsx` (486L).
-- [ ] **UX, Accessibility & Motion Craft:**
-  - [ ] Sync Library filters, search, sort, and view mode to URL search params so navigating back from `/library/[id]` preserves state.
-  - [ ] Convert `<div onClick={() => router.push(...)}>` cards to semantic `<Link>` elements.
-  - [ ] Upgrade `components/Modal.tsx` with `role="dialog"`, `aria-modal="true"`, Escape & backdrop close, and focus management; add mobile filter drawer on `/library` and responsive step bar on `/recommendations`.
-  - [ ] Make card quick-actions accessible on touch and keyboard focus (no hover-only controls); add `loading="lazy"` + `onError` fallback to `CoverImage`.
-  - [ ] Replace `transition-all duration-300` and 600ms entrance keyframes with targeted GPU transitions (`150-220ms`, `cubic-bezier(0.23, 1, 0.32, 1)`), `:active { scale(0.97) }`, `@media (hover: hover) and (pointer: fine)`, and complete `prefers-reduced-motion` handling.
-- [ ] **Verification & Docs:**
-  - [ ] Add a lean Playwright E2E smoke test covering the 4 core flows (Library filter/detail, Search → Add, Recommend → Save, Export/Import).
-  - [ ] Update `README.md` to match current architecture (Turso + sessions, real commands, accurate limitations).
+- [x] **Tokens & Anti-Slop Cleanup:**
+  - [x] Define canonical CSS custom properties and Tailwind `@theme` tokens in `app/globals.css` and simplify `lib/ui.ts`.
+  - [x] Remove `components/AmbientBackground.tsx` drifting glow blobs, hero stacked glows, card shimmer sweeps, neon colored box-shadows, and `backdrop-blur-xl` on near-opaque surfaces.
+  - [x] Replace all UI emojis (`✨`, `⚙️`, `🏷️`, `🔥`, `⭐`, `📥`, `📤`, `📚`, `🎭`, `🎯`, `📖`, `📁`, `⚡`, `🔍`, `🏆`) with one unified 16px stroke SVG icon set.
+  - [x] Rewrite vendor-leaking UI copy (`"AniList GraphQL"`, `"Gemini AI"`, `"Why Gemini picks this"`) into natural product copy (`"Why this matches you"`, `"Extra preferences"`, `"Find recommendations"`).
+- [x] **Layout & Visual Consistency:**
+  - [x] Standardize container width to `max-w-7xl` across `Nav.tsx` and every page route.
+  - [x] Unify page headers (`PageHeader`), border radii (`rounded-xl` cards/panels, `rounded-lg` inputs/list items, `rounded-full` pills/buttons), and `1px` borders.
+  - [x] Render actual stored `category.color` on category chips and filter pills instead of hardcoded blue/gold.
+  - [x] Match `MangaCardSkeletons` grid columns (`grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5`) to the real poster grids; remove invalid utility classes (`py-0.2`).
+- [x] **Decompose Monolithic Pages:**
+  - [x] Split `app/library/page.tsx` (964L) into `LibrarySidebar`, `LibraryToolbar`, `LibraryGrid`, `LibraryList`, `ManageCategoriesModal`, and `ImportLibraryModal`.
+  - [x] Split `app/recommendations/page.tsx` (713L) into `FilterStep`, `BaseMangaStep`, `RecommendationResults`, and `RecommendationCard`.
+  - [x] Extract `MangaPosterCard` and `AddToLibraryModal` from `app/search/page.tsx` (486L).
+- [x] **UX, Accessibility & Motion Craft:**
+  - [x] Sync Library filters, search, sort, and view mode to URL search params so navigating back from `/library/[id]` preserves state.
+  - [x] Convert `<div onClick={() => router.push(...)}>` cards to semantic `<Link>` elements.
+  - [x] Upgrade `components/Modal.tsx` with `role="dialog"`, `aria-modal="true"`, Escape & backdrop close, and focus management; add mobile filter drawer on `/library` and responsive step bar on `/recommendations`.
+  - [x] Make card quick-actions accessible on touch and keyboard focus (no hover-only controls); add `loading="lazy"` + `onError` fallback to `CoverImage`.
+  - [x] Replace `transition-all duration-300` and 600ms entrance keyframes with targeted GPU transitions (`150-220ms`, `cubic-bezier(0.23, 1, 0.32, 1)`), `:active { scale(0.97) }`, `@media (hover: hover) and (pointer: fine)`, and complete `prefers-reduced-motion` handling.
+- [x] **Verification & Docs:**
+  - [x] Add a lean Playwright E2E smoke test covering the 4 core flows (Library filter/detail, Search → Add, Recommend → Save, Export/Import).
+  - [x] Update `README.md` to match current architecture (Turso + sessions, real commands, accurate limitations).
+  - [x] *(Found in review)* Modal focus trap leaked on Shift+Tab from a focused sheet; library view went stale on same-route navigation (Nav → Library while filtered); covers that failed before hydration never showed the title fallback; a failed category tag, toggle, or post-import refresh was reported as (or hid) a failure. All fixed with regression tests.
+  - [x] *(Added)* Playwright smoke wired into CI (`npm run test:e2e` after the build; throwaway `prisma/e2e.db`, catalogue/ranking stubbed at the browser boundary). Page-flow regressions from Slice 1 ported from the hook-mock harness to Testing Library + jsdom.
 
 **Exit Gate:** Desktop + mobile visual check matches `DESIGN.md`; lint, typecheck, Vitest, Playwright smoke, and production build all green.
 

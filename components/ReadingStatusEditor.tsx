@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import TogglePill from "@/components/TogglePill";
 import { updateManga } from "@/lib/api-client";
 import { READING_STATUSES } from "@/lib/manga";
-import { LABEL } from "@/lib/ui";
+import { LABEL, cn } from "@/lib/ui";
 
 export default function ReadingStatusEditor({
   mangaId,
@@ -35,19 +34,30 @@ export default function ReadingStatusEditor({
 
   return (
     <div>
-      <p className={`mb-2 ${LABEL}`}>Reading Status</p>
-      <div className="flex flex-wrap gap-1.5">
-        {READING_STATUSES.map((s) => (
-          <TogglePill
-            key={s.value}
-            active={status === s.value}
-            onClick={() => updateStatus(s.value)}
-            disabled={busy}
-            className="px-4 py-2 text-xs"
-          >
-            {s.label}
-          </TogglePill>
-        ))}
+      <p id={`status-${mangaId}`} className={cn("mb-2.5", LABEL)}>Reading status</p>
+      <div
+        role="group"
+        aria-labelledby={`status-${mangaId}`}
+        className="grid grid-cols-3 gap-1 rounded-lg border border-hairline bg-ink p-1"
+      >
+        {READING_STATUSES.map((s) => {
+          const active = status === s.value;
+          return (
+            <button
+              key={s.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => updateStatus(s.value)}
+              disabled={busy}
+              className={cn(
+                "h-8 rounded-md text-sm transition-[background-color,color] duration-150 ease-snap disabled:opacity-60",
+                active ? "bg-elevated text-paper" : "text-slate hover:text-paper"
+              )}
+            >
+              {s.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,95 +1,148 @@
 @import "tailwindcss";
 
+/*
+ * MangaMatch design tokens — "The Late-Night Manga Shelf" (see DESIGN.md).
+ * Every colour, radius, shadow, and easing used by the UI comes from here;
+ * components reference them as Tailwind utilities (bg-shelf, text-slate,
+ * border-hairline, ease-snap, shadow-overlay, ...).
+ */
 :root {
-  --background: #0B1220;
-  --foreground: #F5F5F0;
+  --canvas-ink: #0B1220;
+  --surface-shelf: #111B2E;
+  --surface-elevated: #162338;
+  --border-hairline: #1E2C42;
+  --border-strong: #2D4160;
+  --text-paper: #F5F5F0;
+  --text-slate: #94A6C2;
+  --text-muted: #6B7E9B;
+  --accent-brass: #E8C77E;
+  --accent-brass-hover: #F2D99B;
+  --status-reading: #60A5FA;
+  --status-completed: #34D399;
+  --status-planning: #FBBF24;
+  --status-releasing: #A78BFA;
+  --status-hiatus: #FB923C;
+  --danger: #F87171;
+  --ease-snap: cubic-bezier(0.23, 1, 0.32, 1);
+
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-body);
-  --font-mono: var(--font-mono);
+  --color-ink: var(--canvas-ink);
+  --color-shelf: var(--surface-shelf);
+  --color-elevated: var(--surface-elevated);
+  --color-hairline: var(--border-hairline);
+  --color-hairline-strong: var(--border-strong);
+  --color-paper: var(--text-paper);
+  --color-slate: var(--text-slate);
+  --color-muted: var(--text-muted);
+  --color-brass: var(--accent-brass);
+  --color-brass-hover: var(--accent-brass-hover);
+  --color-reading: var(--status-reading);
+  --color-completed: var(--status-completed);
+  --color-planning: var(--status-planning);
+  --color-releasing: var(--status-releasing);
+  --color-hiatus: var(--status-hiatus);
+  --color-danger: var(--danger);
+
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --ease-snap: var(--ease-snap);
+  --shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  --animate-enter: enter 200ms var(--ease-snap) both;
+  --animate-dialog-in: dialog-in 180ms var(--ease-snap) both;
+  --animate-sheet-in: sheet-in 220ms var(--ease-snap) both;
+  --animate-fade-in: fade-in 150ms ease-out both;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+/* Lift/zoom hovers only on devices that truly hover with a fine pointer. */
+@custom-variant fine {
+  @media (hover: hover) and (pointer: fine) {
+    @slot;
+  }
 }
 
-/* Entrance animation, used for staggered content reveals */
-@keyframes fade-in-up {
+@keyframes enter {
   from {
     opacity: 0;
-    transform: translateY(12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: translateY(6px);
   }
 }
 
-.animate-fade-in-up {
-  animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* Slow ambient drift for background glow blobs */
-@keyframes drift {
-
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-
-  50% {
-    transform: translate(20px, -20px) scale(1.05);
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
   }
 }
 
-.animate-drift {
-  animation: drift 12s ease-in-out infinite;
+@keyframes sheet-in {
+  from {
+    transform: translateX(-100%);
+  }
 }
 
-/* Gradient text for headline accents */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@layer base {
+  body {
+    background: var(--canvas-ink);
+    color: var(--text-paper);
+  }
+
+  ::selection {
+    background: rgba(232, 199, 126, 0.3);
+    color: var(--text-paper);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent-brass);
+    outline-offset: 2px;
+  }
+}
+
+/* Gold gradient for the single emphasised phrase on the landing hero. */
 .text-gradient-gold {
-  background: linear-gradient(135deg, #F5F5F0 0%, #E8C77E 100%);
+  background: linear-gradient(135deg, var(--text-paper) 0%, var(--accent-brass) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-/* Subtle shimmer sweep, used sparingly on hero accents */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-
-  100% {
-    background-position: 200% 0;
-  }
+/* Thin, quiet scrollbars for the sidebar's scrolling facet lists. */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
-.animate-shimmer {
-  background-size: 200% 100%;
-  animation: shimmer 3s ease-in-out infinite;
-}
-
+/*
+ * Reduced motion: no slides, zooms, lifts, or pulses — keep only quick
+ * opacity fades so state changes are still perceivable.
+ */
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
 
-  .animate-fade-in-up,
-  .animate-drift {
+  .animate-enter,
+  .animate-dialog-in,
+  .animate-sheet-in {
+    animation-name: fade-in;
+    animation-duration: 150ms;
+  }
+
+  .animate-pulse,
+  .animate-spin {
     animation: none;
   }
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 30%,
-      transparent 40%,
-      rgba(11, 18, 32, 0.4) 100%);
-  pointer-events: none;
-  z-index: -1;
 }

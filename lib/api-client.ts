@@ -15,10 +15,10 @@ export async function fetchCategories(): Promise<Category[]> {
   return data.categories ?? [];
 }
 
-export async function createCategory(name: string): Promise<Category> {
+export async function createCategory(name: string, color?: string): Promise<Category> {
   const data = await fetchJson<{ category: Category }>(
     "/api/categories",
-    jsonRequest("POST", { name })
+    jsonRequest("POST", color ? { name, color } : { name })
   );
   return data.category;
 }

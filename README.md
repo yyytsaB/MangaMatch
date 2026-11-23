@@ -4,151 +4,126 @@
 
 ##
 
-A personal manga tracking and AI-powered recommendation app. Search or browse manga, build a personal library of what you're reading (or want to read), organize it with custom categories, and get tailored recommendations based on your genre preferences, reading history, and specific manga you already love — powered by real AniList GraphQL data, not AI guesswork.
+MangaMatch is a personal manga tracker with grounded recommendations. Search or browse real catalogue data, keep a shelf of what you're reading, organise it with your own colour-coded categories, and get five picks at a time that are ranked against your taste — every pick is a real manga from [AniList](https://anilist.co/), never a title an AI made up.
+
+No account needed: each browser gets an anonymous session, and a starter shelf is seeded on the first visit so there's something to explore.
 
 ## Features
 
-- **Search & Browse**
-  - Instant search via the [AniList GraphQL API](https://docs.anilist.co/) (official, no API key needed for public search)
-  - "Trending Now / All-Time Popular / Top Rated" tabbed browse view with optional genre filtering and per-tab result caching
-  - High-density 4–5 column poster card grid with star scores, publication status chips, and direct reader shortcuts
-- **Library**
-  - Save manga with rich metadata (2:3 vertical cover art, synopsis, author, chapters, volumes, publication dates, AniList score, and official AniList links)
-  - **Sticky Left Vertical Filter Sidebar**: Vertically stacked filters for Reading Status, Custom Categories, and Genres with live item counts and a quick "Reset All" button
-  - **High-Density Poster Grid & Compact List View** toggle
-  - **Sort** by Recently Added, Title (A-Z), Highest Rated, Year (Newest/Oldest), or Recently Updated
-  - In-library text search with instant title filtering
-  - Assign categories right when adding a manga (or skip it) via a quick popup
-- **Reading Status & Ratings** — Track Planning / Reading / Completed per manga, and rate titles on a 1–10 scale
-- **Custom Category Tags** — Tag manga into your own groupings (e.g. "Favorites", "Action Classics"), with a "Manage Categories" panel to create or delete tags
-- **Direct Online Reader Shortcuts** — Quick redirection links to **MangaFire** (`mangafire.to`) and **Comix** (`comix.to`) with relevance sorting
-- **Library Backup & Restore (JSON Export / Import)**
-  - **📥 Export**: One-click downloadable JSON backup containing your entire library, ratings, statuses, and category tags
-  - **📤 Import**: Interactive modal with backup validation, preview statistics, and flexible restoration modes (**Merge & Update** or **Replace Library**)
-- **AI Recommendations** — Guided 3-step matchmaker built around real data:
-  1. Pick genres, themes, completion status, chapter length, content rating, and optional custom instructions for Gemini
-  2. Anchor recommendations around one or more favorites from your library
-  3. Get a 2-column showcase of 5 suggestions with:
-     - **✦ Golden AI Rationale Callout Box**: Explains why Gemini picked the manga for your tastes
-     - Full cover poster, chapters, genres, and synopsis
-     - Quick "+ Save to Library", "Mark as Read", **🔥 MangaFire ↗**, and **AniList ↗** links
-     - Toolbar with "Suggest More ↻" and "Diverge ✨" actions
+- **Library** — poster grid or compact list, filters for reading status, category, and genre, in-library title search, and six sort orders. Filters, search, sort, and layout live in the URL, so Back from a title (or a shared link) returns to the exact same shelf. On phones the filters move into a slide-over drawer.
+- **Title pages** — reading status, a 1–10 rating, colour-coded categories, publication metadata, synopsis, and quick links to online readers.
+- **Search & browse** — title search plus Trending / Most popular / Top rated tabs with a genre filter. Titles already on your shelf show as *In library*.
+- **Recommendations** — a three-step flow: pick genres, themes, completion status, length, content rating, and free-text extra preferences; optionally anchor on favourites from your library; then get five picks, each with a *Why this matches you* rationale. Save a pick, mark it as already read (saved as *Completed*), ask for more, or ask for something different.
+- **Backup & restore** — export your library and categories as JSON, then import it later in *Merge & update* or *Replace library* mode.
 
 ## Tech Stack
 
 | Layer | Choice |
-|---|---|
-| Framework | [Next.js](https://nextjs.org/) (App Router + Turbopack) + TypeScript |
-| UI | React 19 |
-| Styling | Tailwind CSS v4 + Glassmorphism surfaces |
-| Fonts | Space Grotesk (display), Inter (body), JetBrains Mono (labels) — via `next/font/google` |
-| Database | SQLite via [Prisma ORM](https://www.prisma.io/) |
-| Manga data | [AniList GraphQL API](https://docs.anilist.co/) |
-| AI ranking | [Gemini API](https://ai.google.dev/) (Gemini Flash — free tier) |
-| Testing | [Vitest](https://vitest.dev/) (11 test suites, 114 passing tests) |
-| CI/CD | [GitHub Actions](https://github.com/features/actions) (`.github/workflows/ci.yml`) |
+| --- | --- |
+| Framework | [Next.js 16](https://nextjs.org/) (App Router, Turbopack, `proxy.ts` for session cookies) + React 19 + TypeScript |
+| Styling | Tailwind CSS v4 with design tokens in `app/globals.css` (see `DESIGN.md`) |
+| Fonts | Space Grotesk (display), Inter (body), JetBrains Mono (labels) via `next/font/google` |
+| Database | Prisma 6 — local SQLite in development, [Turso](https://turso.tech/) (libSQL) in production |
+| Catalogue data | [AniList GraphQL API](https://docs.anilist.co/) (public, no key) |
+| Ranking | [Gemini API](https://ai.google.dev/) (Flash) with structured JSON output |
+| Testing | [Vitest](https://vitest.dev/) + Testing Library (unit, API route, and component suites), [Playwright](https://playwright.dev/) (E2E smoke) |
+| CI | GitHub Actions — typecheck, Vitest, lint, build, Playwright (`.github/workflows/ci.yml`) |
 
 ## Getting Started
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18+)
-- A free [Gemini API key](https://aistudio.google.com/apikey)
+
+- [Node.js](https://nodejs.org/) 20+
+- A free [Gemini API key](https://aistudio.google.com/apikey) (only needed for recommendations)
 
 ### Setup
 
-1. Install dependencies:
+1. Install dependencies (this also runs `prisma generate`):
+
    ```bash
    npm install
    ```
 
-2. Create a `.env.local` file in the project root:
-   ```
-   GEMINI_API_KEY=your_key_here
-   ```
+2. Create `.env.local` in the project root:
 
-3. Set up the database:
    ```bash
-   npx prisma generate
-   npx prisma db push
+   GEMINI_API_KEY=your_key_here
+   DATABASE_URL=file:./dev.db
    ```
 
-4. Run the dev server:
+   For production on Turso, set `DATABASE_URL=libsql://<your-db>.turso.io` and `TURSO_AUTH_TOKEN` in your host's environment instead. Never commit either value.
+
+3. Create the local database:
+
+   ```bash
+   npx prisma migrate deploy
+   ```
+
+4. Start the dev server and open [http://localhost:3000](http://localhost:3000):
+
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000)
+> **Windows:** if PowerShell blocks the `npm.ps1` / `npx.ps1` shims, use `npm.cmd` and `npx.cmd`.
 
-### Tests
+### Quality gates
 
-Unit and integration tests run on [Vitest](https://vitest.dev/) across helper libraries (`lib/`) and route handlers (`app/api/`). Network calls (AniList, Gemini) and Prisma queries are fully mocked.
+Every change should leave all of these green (CI runs the same steps):
 
 ```bash
-npm test              # run all 11 test suites (114 tests)
-npm run test:watch    # watch mode
-npm run test:coverage # coverage report
+npm test                          # Vitest: lib/, app/api/, components, and page flows
+npx tsc --noEmit                  # strict typecheck
+npm run lint -- --max-warnings=0  # ESLint (Next.js + React 19 rules)
+npm run build                     # prisma generate && next build
+npm run test:e2e                  # Playwright smoke (needs a build first)
 ```
+
+The Playwright suite (`e2e/smoke.spec.ts`) covers the four core flows — library filter → detail → back, search → add, recommend → save, and export → import — plus the mobile filter drawer. It starts `next start` on port 3100 against a throwaway SQLite file (`prisma/e2e.db`, recreated each run) and stubs the catalogue and ranking endpoints in the browser, so it needs no API keys and never touches a remote database. Install the browser once with `npx playwright install chromium`.
 
 ## Project Structure
 
 ```
 app/
-  api/
-    manga/
-      search/          — GET: search AniList by query
-      trending/        — GET: browse AniList by trending/popular/top-rated
-      add/             — POST: save a manga to the library
-      list/            — GET: fetch the full library
-      export/          — GET: export library and categories as JSON backup
-      import/          — POST: restore/merge library from JSON backup
-      [id]/            — PATCH (status, rating) / DELETE
-      [id]/categories/ — POST/DELETE: assign/unassign a category
-    categories/        — GET/POST: list/create categories
-    categories/[id]/   — DELETE: remove a category
-    recommend/         — POST: candidate pool + Gemini ranking
-  library/             — personal library with vertical filter sidebar & high-density grid
-  library/[id]/        — manga detail page (status, rating, category tags, reader shortcuts, delete)
-  search/              — search + browse tabs with 4-5 column poster grid
-  recommendations/     — 3-step AI recommendation wizard & 2-column showcase
-  layout.tsx           — root layout, font setup, glassmorphism nav
-  page.tsx             — landing hero, quick stats & recent covers
-lib/
-  anilist.ts           — AniList GraphQL client (search, browse, candidate pool, recommendations)
-  gemini.ts            — ranking prompt builder & response parser
-  api-client.ts        — frontend typed API client (including export/import)
-  db.ts                — Prisma client singleton
+  page.tsx                 landing page + recently added (server component)
+  library/page.tsx         Suspense shell for the URL-driven library view
+  library/[id]/page.tsx    title page (session-scoped server component)
+  search/page.tsx          search + browse
+  recommendations/page.tsx three-step recommendation flow
+  api/                     manga CRUD, search/browse, export/import, categories, recommend
 components/
-  Nav.tsx              — glassmorphic navigation bar
-  Toast.tsx            — animated feedback toast notifications
-  ConfirmModal.tsx     — accessible confirmation dialog
-  CategoryManager.tsx  — category tag assignment
-  ReadingStatusEditor.tsx — reading status selector
-  RatingEditor.tsx     — 10-star rating selector
-  DeleteMangaButton.tsx — manga deletion modal trigger
-  MangaCardSkeletons.tsx — poster grid loading states
-  RecommendingModal.tsx — AI thinking overlay
-tests/
-  api/                 — route handler unit tests (export/import, add, list, search, recommend, categories)
-  lib/                 — AniList GraphQL & Gemini prompt tests
-.github/
-  workflows/ci.yml     — automated GitHub Actions CI pipeline
+  library/                 LibraryView, LibrarySidebar, LibraryToolbar, LibraryGrid, LibraryList,
+                           ManageCategoriesModal, ImportLibraryModal, BackToLibraryLink
+  search/                  MangaPosterCard, AddToLibraryModal
+  recommendations/         StepIndicator, FilterStep, BaseMangaStep, RecommendationResults,
+                           RecommendationCard
+  Icons.tsx                the single 16px stroke icon set
+  Modal.tsx                accessible dialog / sheet (focus trap, Escape, backdrop, focus restore)
+  …                        PageHeader, CoverImage, Toast, ConfirmModal, StatusBadge, CategoryChip, editors
+lib/
+  anilist.ts               AniList queries, retries, candidate pool
+  gemini.ts                ranking prompt, Gemini client, structured-output parsing
+  library-view.ts          library URL state, filtering/sorting, facet counts
+  session.ts, http.ts      anonymous session lookup, client fetch helper
+  validation.ts            request validation shared by every write route
+  ui.ts                    Tailwind recipes built on the design tokens
+prisma/                    schema + migrations (Manga, Category, StarterLibrary — all session-scoped)
+proxy.ts                   issues the session cookie on first visit
+tests/                     Vitest suites (api/, lib/, components/, pages/)
+e2e/                       Playwright smoke tests
 ```
 
 ## How Recommendations Work
 
-1. **`getCandidatePool()`** (`lib/anilist.ts`) queries AniList directly for real manga — one batch sorted by popularity and one batch biased toward the last 2 years, merged and deduplicated.
-2. If you selected a base manga, **`getMediaRecommendations()`** pulls AniList's community "similar manga" graph and merges those in too.
-3. A lenient filter pass ensures candidates match known completion status and chapter criteria without punishing ongoing series.
-4. The resulting real candidate pool is passed to Gemini, which **selects and ranks the top 5 by index**. Gemini never invents titles from memory, and outputs a personalized rationale for each pick.
+1. `getCandidatePool()` (`lib/anilist.ts`) fetches real manga that match your filters. Content rating maps to AniList genres: *Safe* excludes Ecchi, *Mature* targets Ecchi, and adult/Hentai titles are always excluded.
+2. If you anchored on favourites, AniList's community "readers also liked" recommendations for those titles go to the front of the pool.
+3. Titles already in your library, and picks you've already seen, are excluded by AniList ID.
+4. Gemini receives the numbered candidate list (with chapter counts and scores) and returns structured JSON selecting five by index, each with a short rationale. It can only rank what it was given.
 
 ## Known Limitations
 
-- Single-user local storage model (everything lives in your local SQLite `dev.db`, easily backed up via the built-in Export JSON tool).
-- Content rating filtering ("safe" mode) is a tag-based heuristic (excludes Hentai/Ecchi tags).
-- No image caching proxy for cover art — covers are loaded directly from AniList's CDN.
-
-## Roadmap Ideas
-
-- **Pagination & Infinite Scroll** for library and browse views (for collections exceeding 100+ titles)
-- **Normalized Genre / Author Tables** for complex relational database queries
-- **Multi-User Authentication & Cloud Database** (Optional future expansion)
+- Anonymous sessions only: your library lives with the session cookie in one browser. Use **Export** to move it elsewhere (optional accounts are planned in `ROADMAP.md`).
+- Search and browse show a single page of results.
+- Content rating is genre-based (AniList's Ecchi/Hentai genres), not a per-chapter rating.
+- Covers load straight from AniList's CDN (lazy-loaded, with a title fallback if one fails).
+- Recommendations need a `GEMINI_API_KEY`; everything else works without one.
