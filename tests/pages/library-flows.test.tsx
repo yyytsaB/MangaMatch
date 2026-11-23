@@ -93,7 +93,7 @@ describe("Search page", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save to library" }));
 
     expect(await screen.findByRole("button", { name: "Candidate is in your library" })).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toMatch(/Added .*Candidate.*category/i);
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/Added .*Candidate.*category/i));
   });
 });
 

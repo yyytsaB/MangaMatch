@@ -146,7 +146,7 @@ describe("Library page", () => {
     fireEvent.click(restore);
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import a backup" })).toBeNull());
-    expect(screen.getByRole("status").textContent).toMatch(/Restored/);
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/Restored/));
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
