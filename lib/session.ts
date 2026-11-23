@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { unstable_rethrow } from "next/navigation";
 import { NextRequest } from "next/server";
 
 export const SESSION_COOKIE = "mangamatch_session";
@@ -40,8 +41,10 @@ export async function getSessionId(req?: Request | NextRequest): Promise<string>
     if (serverCookie && serverCookie.trim()) {
       return serverCookie.trim();
     }
-  } catch {
-    // cookies() can throw if called outside Next.js request lifecycle
+  } catch (err) {
+    // Prerender bailouts must reach Next.js, or session pages get cached statically.
+    unstable_rethrow(err);
+    // Outside a Next.js request (e.g. tests), fall back to the default session.
   }
 
   return "default";
