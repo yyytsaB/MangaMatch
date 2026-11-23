@@ -263,11 +263,13 @@ export default function LibraryPage() {
         case "title-az":
           return a.title.localeCompare(b.title);
         case "year-newest":
-          return (b.publishedFrom ?? "").localeCompare(a.publishedFrom ?? "");
-        case "year-oldest":
-          if (!a.publishedFrom) return 1;
-          if (!b.publishedFrom) return -1;
-          return a.publishedFrom.localeCompare(b.publishedFrom);
+        case "year-oldest": {
+          const leftDate = Date.parse(a.publishedFrom ?? "");
+          const rightDate = Date.parse(b.publishedFrom ?? "");
+          if (Number.isNaN(leftDate)) return Number.isNaN(rightDate) ? 0 : 1;
+          if (Number.isNaN(rightDate)) return -1;
+          return sortBy === "year-newest" ? rightDate - leftDate : leftDate - rightDate;
+        }
         case "highest-rated":
           return (b.rating ?? -1) - (a.rating ?? -1);
         case "latest-update":

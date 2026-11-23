@@ -45,6 +45,27 @@ afterEach(() => {
 });
 
 describe("POST /api/manga/add", () => {
+  it("saves a validated completed status and normalizes lists and dates", async () => {
+    upsert.mockResolvedValue({ id: 1 });
+    const res = await POST(postRequest({
+      anilistId: 1, title: "Read", readingStatus: "completed",
+      genres: [" Action ", " "], authors: [" Writer "],
+      publishedFrom: "March 4, 2018", publishedTo: "2020-02-31",
+    }));
+
+    expect(res.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ readingStatus: "completed", genres: "Action", authors: "Writer", publishedFrom: "2018-03-04", publishedTo: null }),
+    }));
+  });
+
+  it("rejects an unsupported reading status without writing", async () => {
+    const res = await POST(postRequest({ anilistId: 1, title: "Read", readingStatus: "abandoned" }));
+
+    expect(res.status).toBe(400);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["anilistId", { title: "Berserk", genres: [], authors: [] }],
     ["title", { anilistId: 1, genres: [], authors: [] }],

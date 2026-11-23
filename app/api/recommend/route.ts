@@ -1,6 +1,5 @@
 // POST /api/recommend
-// Pulls a real candidate pool from AniList (broad, filtered only by
-// completion status server-side), then asks Gemini to rank the best 5
+// Pulls a real candidate pool from AniList, then asks Gemini to rank the best 5
 // from that real list using genre/chapter-length/base-manga similarity
 // as soft preferences.
 import { NextRequest, NextResponse } from "next/server";
@@ -19,18 +18,17 @@ import {
   CONTENT_RATING_OPTIONS,
   matchesChapterLength,
   matchesCompletionStatus,
+  matchesContentRating,
 } from "@/lib/filters";
 import { getSessionId } from "@/lib/session";
 import {
   MAX_TEXT_LENGTH,
-  MAX_TITLE_LENGTH,
+  MAX_EXCLUDED_ANILIST_IDS,
   parseId,
   parseIntegerArray,
   parseStringArray,
   readJsonBody,
 } from "@/lib/validation";
-
-const MAX_EXCLUDED_TITLES = 500;
 
 export async function POST(req: NextRequest) {
   const body = await readJsonBody(req);
@@ -44,11 +42,11 @@ export async function POST(req: NextRequest) {
     customQuery = "",
   } = body;
   const genres = parseStringArray(body.genres, 100);
-  const excludeTitles = parseStringArray(body.excludeTitles, MAX_TITLE_LENGTH, MAX_EXCLUDED_TITLES);
+  const excludeAnilistIds = parseIntegerArray(body.excludeAnilistIds, MAX_EXCLUDED_ANILIST_IDS);
   const baseMangaIds = parseIntegerArray(body.baseMangaIds);
   const page = body.page === undefined ? 1 : parseId(body.page);
 
-  if (!genres || !excludeTitles || !baseMangaIds || !page ||
+  if (!genres || !excludeAnilistIds || !baseMangaIds || !page ||
       typeof customQuery !== "string" || customQuery.length > MAX_TEXT_LENGTH ||
       typeof diverge !== "boolean" ||
       typeof completionStatus !== "string" || !COMPLETION_STATUS_OPTIONS.some(({ value }) => value === completionStatus) ||
@@ -74,62 +72,29 @@ export async function POST(req: NextRequest) {
       baseMangaAnilistIds = mangaList.map((manga) => manga.anilistId);
     }
 
-    // Exclude everything already in the user's session library
     const libraryManga = await prisma.manga.findMany({
       where: { sessionId },
-      select: { title: true },
+      select: { anilistId: true },
     });
-    const excludeTitlesLower = new Set(
-      [...excludeTitles, ...libraryManga.map((m) => m.title)].map((t: string) =>
-        t.toLowerCase()
-      )
-    );
+    const seen = new Set([...excludeAnilistIds, ...libraryManga.map((manga) => manga.anilistId)]);
 
-    // Candidate pool — one query per selected genre/theme, so genre acts
-    // as "any of these"; only completion status is a hard filter.
-    const rawPool = await getCandidatePool({
-      genres,
-      completionStatus,
-      chapterLength,
-      page,
-    });
+    const [rawPool, communityLists] = await Promise.all([
+      getCandidatePool({ genres, completionStatus, chapterLength, contentRating, page }),
+      Promise.all(baseMangaAnilistIds.slice(0, 2).map((id) => getMediaRecommendations(id))),
+    ]);
 
-    let pool: MangaResult[] = [...rawPool];
-
-    // Merge in AniList's own community recommendations for top 2 base manga
-    if (baseMangaAnilistIds.length > 0) {
-      const targetBaseIds = baseMangaAnilistIds.slice(0, 2);
-      const recLists = await Promise.all(
-        targetBaseIds.map((id) => getMediaRecommendations(id))
-      );
-      const seen = new Set(pool.map((m) => m.anilistId));
-      for (const list of recLists) {
-        for (const m of list) {
-          if (!seen.has(m.anilistId)) {
-            seen.add(m.anilistId);
-            pool.push(m);
-          }
-        }
-      }
+    const topPool: MangaResult[] = [];
+    for (const manga of [...communityLists.flat(), ...rawPool]) {
+      if (seen.has(manga.anilistId) ||
+          !matchesCompletionStatus(manga.status, completionStatus) ||
+          !matchesChapterLength(manga.chapters, chapterLength) ||
+          !matchesContentRating(manga.genres, contentRating)) continue;
+      seen.add(manga.anilistId);
+      topPool.push(manga);
+      if (topPool.length === 25) break;
     }
 
-    // Lenient pass: only excludes candidates out of range
-    pool = pool.filter(
-      (m) =>
-        matchesCompletionStatus(m.status, completionStatus) &&
-        matchesChapterLength(m.chapters, chapterLength)
-    );
-
-    // Filter out anything already in the session library or already seen this session
-    pool = pool.filter((m) => !excludeTitlesLower.has(m.title.toLowerCase()));
-
-    if (contentRating === "safe") {
-      pool = pool.filter(
-        (m) => !m.genres.includes("Hentai") && !m.genres.includes("Ecchi")
-      );
-    }
-
-    if (pool.length === 0) {
+    if (topPool.length === 0) {
       return NextResponse.json({
         recommendations: [],
         note:
@@ -139,7 +104,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const topPool = pool.slice(0, 25);
     const candidatesForGemini: CandidateManga[] = topPool.map((m) => ({
       anilistId: m.anilistId,
       title: m.title,
@@ -154,6 +118,7 @@ export async function POST(req: NextRequest) {
       genres,
       completionStatus,
       chapterLength,
+      contentRating,
       baseManga,
       diverge,
       customQuery,
@@ -162,15 +127,9 @@ export async function POST(req: NextRequest) {
     const recommendations = picks.slice(0, 5).map((pick) => {
       const match = topPool[pick.index];
       return {
-        title: match.title,
+        ...match,
         synopsis: match.synopsis ?? "",
         reason: pick.reason,
-        anilistId: match.anilistId,
-        coverUrl: match.coverUrl,
-        genres: match.genres,
-        chapters: match.chapters,
-        status: match.status,
-        siteUrl: match.siteUrl,
       };
     });
  

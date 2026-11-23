@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  getBrowseManga,
-  getCandidatePool,
-  getMediaRecommendations,
-  searchManga,
-} from "@/lib/anilist";
+let anilist: typeof import("@/lib/anilist");
+let searchManga: typeof anilist.searchManga;
+let getBrowseManga: typeof anilist.getBrowseManga;
+let getMediaRecommendations: typeof anilist.getMediaRecommendations;
+let getCandidatePool: typeof anilist.getCandidatePool;
 
 interface FetchCall {
   url: string;
@@ -55,7 +54,10 @@ function pageResponse(media: unknown[]) {
 let calls: FetchCall[];
 let fetchMock: ReturnType<typeof vi.fn>;
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  anilist = await import("@/lib/anilist");
+  ({ searchManga, getBrowseManga, getMediaRecommendations, getCandidatePool } = anilist);
   calls = [];
   fetchMock = vi.fn(async (url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body));
@@ -85,6 +87,7 @@ describe("searchManga", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe("https://graphql.anilist.co");
     expect(calls[0].variables).toEqual({ search: "berserk" });
+    expect(calls[0].query).toContain("isAdult: false");
     expect(results).toEqual([
       {
         anilistId: 30002,
@@ -156,21 +159,52 @@ describe("searchManga", () => {
   });
 
   it("retries transient errors and returns the eventual success", async () => {
+    vi.useFakeTimers();
     fetchMock
       .mockResolvedValueOnce(jsonResponse({}, 429))
       .mockResolvedValueOnce(pageResponse([mediaFixture({ id: 7 })]));
 
-    const results = await searchManga("x");
+    const pending = searchManga("x");
+    await vi.runAllTimersAsync();
+    const results = await pending;
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(results[0].anilistId).toBe(7);
   });
 
   it("gives up after the retry limit on persistent transient errors", async () => {
+    vi.useFakeTimers();
     fetchMock.mockResolvedValue(jsonResponse({}, 503));
 
-    await expect(searchManga("x")).rejects.toThrow(/AniList API error: 503/);
+    const failure = expect(searchManga("x")).rejects.toThrow(/AniList API error: 503/);
+    await vi.runAllTimersAsync();
+    await failure;
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("caches successful searches briefly, without conflating different terms", async () => {
+    vi.useFakeTimers();
+    const first = await searchManga("berserk");
+    expect(await searchManga("berserk")).toEqual(first);
+    await searchManga("monster");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(120_000);
+    await searchManga("berserk");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("sets a fresh deadline for every upstream attempt", async () => {
+    vi.useFakeTimers();
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 429));
+
+    const pending = searchManga("x");
+    await vi.runAllTimersAsync();
+    await pending;
+
+    expect(timeout).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.map(([, init]) => init.signal)).toEqual(timeout.mock.results.map(({ value }) => value));
   });
 });
 
@@ -191,7 +225,20 @@ describe("getBrowseManga", () => {
 
     expect(calls[0].variables.genre).toBe("Romance");
     expect(calls[1].variables.genre).toBeNull();
-    expect(calls[2].variables.genre).toBeNull();
+    expect(calls).toHaveLength(2);
+  });
+
+  it("caches browse by sort and genre, but not after the TTL", async () => {
+    vi.useFakeTimers();
+    await getBrowseManga("trending", "Romance");
+    await getBrowseManga("trending", "Romance");
+    await getBrowseManga("trending", "Action");
+    await getBrowseManga("popular", "Romance");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    vi.advanceTimersByTime(120_000);
+    await getBrowseManga("trending", "Romance");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -204,6 +251,8 @@ describe("getMediaRecommendations", () => {
     fetchMock.mockResolvedValueOnce(
       recResponse([
         { mediaRecommendation: mediaFixture({ id: 1 }) },
+        { mediaRecommendation: mediaFixture({ id: 2, isAdult: true }) },
+        { mediaRecommendation: mediaFixture({ id: 3, genres: ["Hentai"] }) },
         { mediaRecommendation: null },
         {},
       ])
@@ -213,6 +262,8 @@ describe("getMediaRecommendations", () => {
 
     const sentBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
     expect(sentBody.variables).toEqual({ id: 30002 });
+    expect(sentBody.query).toMatch(/Media\(.*isAdult: false/);
+    expect(sentBody.query).toMatch(/mediaRecommendation\s*\{[^}]*\bisAdult\b/);
     expect(results.map((r) => r.anilistId)).toEqual([1]);
   });
 
@@ -222,7 +273,7 @@ describe("getMediaRecommendations", () => {
   });
 
   it("swallows HTTP errors, GraphQL errors and network failures", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({}, 500));
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 404));
     expect(await getMediaRecommendations(1)).toEqual([]);
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ errors: [{}] }));
@@ -239,6 +290,26 @@ describe("getCandidatePool", () => {
     completionStatus: "any",
     chapterLength: "any",
   };
+
+  it.each([["safe", [1]], ["mature", [2]]] as const)(
+    "queries and filters %s content upstream", async (contentRating, expected) => {
+      fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+        calls.push(JSON.parse(String(init.body)));
+        return pageResponse([
+          mediaFixture({ id: 1 }),
+          mediaFixture({ id: 2, genres: ["Action", "Ecchi"] }),
+          mediaFixture({ id: 3, genres: ["Ecchi", "Hentai"] }),
+          mediaFixture({ id: 4, genres: ["Ecchi"], isAdult: true }),
+        ]);
+      });
+      const ratingFilters = { ...baseFilters, contentRating };
+      const pool = await getCandidatePool(ratingFilters);
+
+      expect(pool.map((result) => result.anilistId)).toEqual(expected);
+      expect(calls[0].variables.genre_not_in).toEqual(contentRating === "safe" ? ["Hentai", "Ecchi"] : ["Hentai"]);
+      if (contentRating === "mature") expect(calls[0].variables.genre_in).toEqual(["Ecchi", "Action"]);
+    }
+  );
 
   it("issues a popularity query per selection, plus a recency-biased query", async () => {
     await getCandidatePool(baseFilters);

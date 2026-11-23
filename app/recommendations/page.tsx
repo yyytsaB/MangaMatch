@@ -21,18 +21,13 @@ import {
 import { GENRE_OPTIONS, THEME_OPTIONS, isGenre } from "@/lib/genres";
 import { parseList, toggleSetItem } from "@/lib/manga";
 import type { SavedManga } from "@/lib/types";
+import type { MangaResult } from "@/lib/anilist";
+import { MAX_EXCLUDED_ANILIST_IDS } from "@/lib/validation";
 import { cn, BUTTON_PRIMARY, BUTTON_SECONDARY, LABEL, statusBadge } from "@/lib/ui";
 
-interface Recommendation {
-  title: string;
+interface Recommendation extends MangaResult {
   synopsis: string;
   reason: string;
-  anilistId?: number | null;
-  coverUrl?: string | null;
-  genres?: string[];
-  chapters?: number | null;
-  status?: string | null;
-  siteUrl?: string | null;
 }
 
 export default function RecommendationsPage() {
@@ -49,15 +44,14 @@ export default function RecommendationsPage() {
 
   // Results state
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [seenTitles, setSeenTitles] = useState<Set<string>>(new Set());
+  const [seenIds, setSeenIds] = useState<number[]>([]);
   const [poolPage, setPoolPage] = useState(1);
   const [note, setNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingRec, setConfirmingRec] = useState<Recommendation | null>(null);
   const [addingToLibrary, setAddingToLibrary] = useState(false);
-  const [addedTitles, setAddedTitles] = useState<Set<string>>(new Set());
+  const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
 
   useEffect(() => {
@@ -88,9 +82,7 @@ export default function RecommendationsPage() {
     setError(null);
     setNote(null);
 
-    const excludeTitles = fresh
-      ? []
-      : [...Array.from(dismissed), ...Array.from(seenTitles)];
+    const excludeAnilistIds = fresh ? [] : seenIds;
     const page = fresh ? 1 : poolPage + 1;
 
     try {
@@ -107,7 +99,7 @@ export default function RecommendationsPage() {
           baseMangaIds: Array.from(baseMangaIds),
           diverge,
           customQuery,
-          excludeTitles,
+          excludeAnilistIds,
           page,
         })
       );
@@ -116,12 +108,9 @@ export default function RecommendationsPage() {
       setRecommendations(batch);
       setNote(data.note ?? null);
       setPoolPage(page);
-      setSeenTitles((prev) => {
-        const next = fresh ? new Set<string>() : new Set(prev);
-        for (const rec of batch) next.add(rec.title);
-        return next;
-      });
-      if (fresh) setDismissed(new Set());
+      setSeenIds((previous) => Array.from(new Set([
+        ...(fresh ? [] : previous), ...batch.map((rec) => rec.anilistId),
+      ])).slice(-MAX_EXCLUDED_ANILIST_IDS));
       setStep("results");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -131,24 +120,9 @@ export default function RecommendationsPage() {
   }
 
   async function handleDirectAdd(rec: Recommendation) {
-    if (!rec.anilistId) return;
     try {
-      await addMangaToLibrary({
-        anilistId: rec.anilistId,
-        title: rec.title,
-        genres: rec.genres ?? [],
-        coverUrl: rec.coverUrl ?? null,
-        synopsis: rec.synopsis,
-        status: rec.status ?? null,
-        authors: [],
-        publishedFrom: null,
-        publishedTo: null,
-        chapters: rec.chapters ?? null,
-        volumes: null,
-        score: null,
-        siteUrl: rec.siteUrl ?? null,
-      });
-      setAddedTitles((prev) => new Set(prev).add(rec.title));
+      await addMangaToLibrary(rec);
+      setAddedIds((prev) => new Set(prev).add(rec.anilistId));
       setToastMessage({
         text: `Added "${rec.title}" to your library!`,
         type: "success",
@@ -170,25 +144,8 @@ export default function RecommendationsPage() {
     setAddingToLibrary(true);
 
     try {
-      const targetId = confirmingRec.anilistId;
-      if (targetId) {
-        await addMangaToLibrary({
-          anilistId: targetId,
-          title: confirmingRec.title,
-          genres: confirmingRec.genres ?? [],
-          coverUrl: confirmingRec.coverUrl ?? null,
-          synopsis: confirmingRec.synopsis,
-          status: confirmingRec.status ?? null,
-          authors: [],
-          publishedFrom: null,
-          publishedTo: null,
-          chapters: confirmingRec.chapters ?? null,
-          volumes: null,
-          score: null,
-          siteUrl: confirmingRec.siteUrl ?? null,
-        });
-      }
-      dismissRecommendation(confirmingRec.title);
+      await addMangaToLibrary(confirmingRec, "completed");
+      dismissRecommendation(confirmingRec.anilistId);
       setToastMessage({
         text: `Marked "${confirmingRec.title}" as read & saved to library!`,
         type: "success",
@@ -206,13 +163,12 @@ export default function RecommendationsPage() {
 
   function declineAddToLibrary() {
     if (!confirmingRec) return;
-    dismissRecommendation(confirmingRec.title);
+    dismissRecommendation(confirmingRec.anilistId);
     setConfirmingRec(null);
   }
 
-  function dismissRecommendation(title: string) {
-    setDismissed((prev) => new Set(prev).add(title));
-    setRecommendations((prev) => prev.filter((r) => r.title !== title));
+  function dismissRecommendation(anilistId: number) {
+    setRecommendations((prev) => prev.filter((rec) => rec.anilistId !== anilistId));
   }
 
   const selectedBaseManga = library.filter((m) => baseMangaIds.has(m.id));
@@ -516,12 +472,12 @@ export default function RecommendationsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {recommendations.map((rec, i) => {
                 const statusInfo = statusBadge(rec.status);
-                const isAdded = addedTitles.has(rec.title);
+                const isAdded = addedIds.has(rec.anilistId);
                 const mangafireUrl = `https://mangafire.to/browse?keyword=${encodeURIComponent(rec.title)}&sort=relevance:desc`;
 
                 return (
                   <div
-                    key={rec.title}
+                    key={rec.anilistId}
                     style={{ animationDelay: `${Math.min(i, 8) * 0.07}s` }}
                     className="animate-fade-in-up group flex flex-col sm:flex-row gap-4.5 rounded-3xl border border-[#1E2C42] bg-[#0F1B2E]/90 p-5 shadow-xl backdrop-blur-xl transition-all duration-300 hover:border-[#E8C77E]/50 hover:shadow-[0_15px_35px_rgba(232,199,126,0.15)]"
                   >

@@ -10,9 +10,11 @@ export const READING_STATUS_VALUES: string[] = READING_STATUSES.map(
   (s) => s.value
 );
 
+export type ReadingStatus = (typeof READING_STATUSES)[number]["value"];
+
 /** Splits a comma-separated column (genres, authors) into a clean list. */
 export function parseList(value: string | null | undefined): string[] {
-  return value ? value.split(",").filter(Boolean) : [];
+  return value ? value.split(",").map((item) => item.trim()).filter(Boolean) : [];
 }
 
 /** Returns a new Set with `item` added if absent, removed if present. */

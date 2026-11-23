@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { badRequest, serverError } from "@/lib/api";
 import { getSessionId } from "@/lib/session";
+import { parseList, READING_STATUS_VALUES } from "@/lib/manga";
 import {
   MAX_TEXT_LENGTH,
   MAX_TITLE_LENGTH,
@@ -11,6 +12,7 @@ import {
   parseOptionalInteger,
   parseOptionalNumber,
   parseOptionalString,
+  parsePublicationDate,
   parseString,
   parseStringArray,
   readJsonBody,
@@ -26,11 +28,15 @@ export async function POST(req: NextRequest) {
   const title = parseString(body.title, MAX_TITLE_LENGTH);
   const genres = parseStringArray(body.genres, MAX_TITLE_LENGTH);
   const authors = parseStringArray(body.authors, MAX_TITLE_LENGTH);
+  const { readingStatus = "planning" } = body;
 
   if (!anilistId || !title || !genres || !authors) {
     return badRequest(
       "Invalid or missing fields: anilistId, title, genres, authors"
     );
+  }
+  if (typeof readingStatus !== "string" || !READING_STATUS_VALUES.includes(readingStatus)) {
+    return badRequest("Invalid reading status");
   }
 
   try {
@@ -43,19 +49,19 @@ export async function POST(req: NextRequest) {
           anilistId,
         },
       },
-      update: {}, // if it already exists, do nothing — just confirm success
+      update: body.readingStatus === undefined ? {} : { readingStatus },
       create: {
         sessionId,
         anilistId,
         title,
-        genres: genres.join(","),
+        genres: parseList(genres.join(",")).join(","),
         coverUrl: parseHttpUrl(body.coverUrl),
         synopsis: parseOptionalString(body.synopsis, MAX_TEXT_LENGTH),
         publicationStatus: parseOptionalString(body.status, MAX_TITLE_LENGTH),
-        readingStatus: "planning",
-        authors: authors.length > 0 ? authors.join(",") : null,
-        publishedFrom: parseOptionalString(body.publishedFrom, 32),
-        publishedTo: parseOptionalString(body.publishedTo, 32),
+        readingStatus,
+        authors: parseList(authors.join(",")).join(",") || null,
+        publishedFrom: parsePublicationDate(body.publishedFrom),
+        publishedTo: parsePublicationDate(body.publishedTo),
         chapters: parseOptionalInteger(body.chapters),
         volumes: parseOptionalInteger(body.volumes),
         malScore: parseOptionalNumber(body.score),

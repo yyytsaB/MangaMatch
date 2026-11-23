@@ -47,3 +47,7 @@ model Category {
   @@unique([sessionId, name])
   @@index([sessionId])
 }
+
+model StarterLibrary {
+  sessionId String @id
+}

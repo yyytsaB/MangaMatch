@@ -89,17 +89,36 @@ describe("rankCandidates", () => {
     expect(picks).toEqual([{ index: 0, reason: "Fits" }]);
   });
 
-  it("strips markdown code fences before parsing", async () => {
+  it("rejects fenced text instead of treating it as structured JSON", async () => {
     fetchMock.mockResolvedValueOnce(
       geminiResponse('```json\n[{"index": 1, "reason": "Fenced"}]\n```')
     );
 
-    const picks = await rankCandidates(
+    await expect(rankCandidates(
       [candidate(), candidate({ anilistId: 2 })],
       filters()
-    );
+    )).rejects.toThrow(/Failed to parse Gemini response as JSON/);
+  });
 
-    expect(picks).toEqual([{ index: 1, reason: "Fenced" }]);
+  it("requests structured JSON with index and reason", async () => {
+    await rankCandidates([candidate()], filters());
+
+    const init = fetchMock.mock.calls[0][1];
+    expect(JSON.parse(init.body).generationConfig).toMatchObject({
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "ARRAY",
+        items: { type: "OBJECT", properties: { index: { type: "INTEGER" }, reason: { type: "STRING" } }, required: ["index", "reason"] },
+      },
+    });
+  });
+
+  it("sets a request deadline", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    await rankCandidates([candidate()], filters());
+
+    expect(timeout).toHaveBeenCalledWith(expect.any(Number));
+    expect(fetchMock.mock.calls[0][1].signal).toBe(timeout.mock.results[0].value);
   });
 
   it("drops picks with malformed or out-of-range indices", async () => {
@@ -107,6 +126,7 @@ describe("rankCandidates", () => {
       geminiResponse(
         JSON.stringify([
           { index: 0, reason: "ok" },
+          { index: 0.5, reason: "fractional" },
           { index: 5, reason: "out of range" },
           { index: -1, reason: "negative" },
           { index: "1", reason: "not a number" },
@@ -179,6 +199,7 @@ describe("rankCandidates prompt building", () => {
 
     const prompt = sentPrompt();
     expect(prompt).toContain("Status: unknown");
+    expect(prompt).toContain("Chapters: unknown");
     expect(prompt).toContain("Score: N/A/10");
   });
 
@@ -208,6 +229,15 @@ describe("rankCandidates prompt building", () => {
     expect(prompt).toContain("TARGET GENRES & THEMES (TOP PRIORITY): The user explicitly requested: [Action, Drama]");
     expect(prompt).toContain("Preferred completion status: completed");
     expect(prompt).toContain("Preferred chapter length: long");
+    expect(prompt).toContain("Chapters: 200");
+  });
+
+  it("tells the ranker to prioritize Ecchi for mature requests without allowing Hentai", async () => {
+    const matureFilters = { ...filters(), contentRating: "mature" };
+    await rankCandidates([candidate()], matureFilters);
+
+    expect(sentPrompt()).toMatch(/prioritize.*Ecchi/i);
+    expect(sentPrompt()).toMatch(/exclude.*Hentai/i);
   });
 
   it("uses singular phrasing for one base manga", async () => {

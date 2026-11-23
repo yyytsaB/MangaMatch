@@ -6,6 +6,7 @@
 export const MAX_TEXT_LENGTH = 5000;
 export const MAX_TITLE_LENGTH = 500;
 export const MAX_LIST_LENGTH = 50;
+export const MAX_EXCLUDED_ANILIST_IDS = 500;
 const MAX_DB_INTEGER = 2_147_483_647;
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -52,9 +53,9 @@ export function parseStringArray(
   return out;
 }
 
-export function parseIntegerArray(value: unknown): number[] | null {
+export function parseIntegerArray(value: unknown, maxItems = MAX_LIST_LENGTH): number[] | null {
   if (value === undefined || value === null) return [];
-  if (!Array.isArray(value) || value.length > MAX_LIST_LENGTH) return null;
+  if (!Array.isArray(value) || value.length > maxItems) return null;
   const out: number[] = [];
   for (const item of value) {
     const id = parseId(item);
@@ -74,6 +75,23 @@ export function parseOptionalInteger(value: unknown): number | null {
 export function parseOptionalNumber(value: unknown): number | null {
   if (value === undefined || value === null) return null;
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+export function parsePublicationDate(value: unknown): string | null {
+  const date = parseString(value, 32);
+  if (!date) return null;
+  const isIso = /^\d{4}-\d{2}-\d{2}$/.test(date);
+  if (!isIso && !/^[A-Za-z]+ \d{1,2}, \d{4}$/.test(date)) return null;
+
+  const time = new Date(isIso ? `${date}T00:00:00Z` : `${date} UTC`);
+  if (!Number.isFinite(time.getTime())) return null;
+  const iso = time.toISOString().slice(0, 10);
+  if (isIso) return iso === date ? iso : null;
+
+  const legacy = time.toLocaleDateString("en-US", {
+    timeZone: "UTC", month: "long", day: "numeric", year: "numeric",
+  });
+  return legacy === date ? iso : null;
 }
 
 // Only http(s) URLs are stored — a `javascript:` or `data:` URL saved here

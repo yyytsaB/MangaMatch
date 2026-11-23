@@ -2,15 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const findMany = vi.fn();
-const count = vi.fn();
 vi.mock("@/lib/db", () => ({
   prisma: {
     manga: {
       findMany: (a: unknown) => findMany(a),
-      count: (a: unknown) => count(a),
     },
   },
 }));
+vi.mock("@/lib/starter-data", () => ({ seedStarterLibraryIfEmpty: async () => {} }));
 
 const { GET } = await import("@/app/api/manga/list/route");
 
@@ -19,14 +18,12 @@ function getRequest() {
 }
 
 beforeEach(() => {
-  count.mockResolvedValue(1);
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   findMany.mockReset();
-  count.mockReset();
 });
 
 describe("GET /api/manga/list", () => {

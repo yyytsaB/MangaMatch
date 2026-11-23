@@ -21,6 +21,14 @@ export const CONTENT_RATING_OPTIONS = [
   { value: "mature", label: "Mature" },
 ];
 
+export function matchesContentRating(genres: readonly string[], contentRating = "any"): boolean {
+  if (genres.includes("Hentai")) return false;
+  const ecchi = genres.includes("Ecchi");
+  if (contentRating === "safe") return !ecchi;
+  if (contentRating === "mature") return ecchi;
+  return true;
+}
+
 /** AniList `MediaStatus` values behind each completion status option. */
 export function anilistStatusList(
   completionStatus: string

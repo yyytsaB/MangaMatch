@@ -1,4 +1,4 @@
-import { anilistStatusList } from "@/lib/filters";
+import { anilistStatusList, matchesContentRating } from "@/lib/filters";
 import { isGenre, THEME_OPTIONS } from "@/lib/genres";
 
 export interface MangaResult {
@@ -26,6 +26,7 @@ interface AniListDate {
 /** The `Media` selection shared by every query below. */
 interface AniListMedia {
   id: number;
+  isAdult: boolean;
   siteUrl: string | null;
   title: { romaji: string | null; english: string | null };
   genres: string[] | null;
@@ -47,6 +48,7 @@ interface AniListMedia {
 // selection set is declared once and spliced into each query.
 const MEDIA_FIELDS = `
   id
+  isAdult
   siteUrl
   title { romaji english }
   genres
@@ -67,7 +69,7 @@ const MEDIA_FIELDS = `
 const SEARCH_QUERY = `
 query ($search: String) {
   Page(perPage: 10) {
-    media(search: $search, type: MANGA, sort: SEARCH_MATCH) {
+    media(search: $search, type: MANGA, sort: SEARCH_MATCH, isAdult: false, genre_not_in: ["Hentai"]) {
       ${MEDIA_FIELDS}
     }
   }
@@ -77,7 +79,7 @@ query ($search: String) {
 const BROWSE_QUERY = `
 query ($sort: [MediaSort], $genre: String) {
   Page(perPage: 10) {
-    media(type: MANGA, sort: $sort, genre: $genre, isAdult: false) {
+    media(type: MANGA, sort: $sort, genre: $genre, isAdult: false, genre_not_in: ["Hentai"]) {
       ${MEDIA_FIELDS}
     }
   }
@@ -86,7 +88,7 @@ query ($sort: [MediaSort], $genre: String) {
 
 const MEDIA_RECOMMENDATIONS_QUERY = `
 query ($id: Int) {
-  Media(id: $id, type: MANGA) {
+  Media(id: $id, type: MANGA, isAdult: false, genre_not_in: ["Hentai"]) {
     recommendations(sort: RATING_DESC, perPage: 10) {
       nodes {
         mediaRecommendation {
@@ -159,6 +161,7 @@ async function postAniList<T>(
         Accept: "application/json",
       },
       body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(5_000),
     });
 
     if (res.ok) {
@@ -198,13 +201,35 @@ async function fetchAniList(
     query,
     variables
   );
-  return data?.Page?.media ?? [];
+  return (data?.Page?.media ?? []).filter(isNonAdultMedia);
+}
+
+function isNonAdultMedia(item: AniListMedia | null | undefined): item is AniListMedia {
+  return item != null && item.isAdult !== true && matchesContentRating(item.genres ?? []);
+}
+
+const CATALOG_CACHE_TTL_MS = 60_000;
+const MAX_CATALOG_CACHE_ENTRIES = 128;
+const catalogCache = new Map<string, { expiresAt: number; results: MangaResult[] }>();
+
+async function fetchCachedCatalog(query: string, variables: Record<string, unknown>): Promise<MangaResult[]> {
+  const key = JSON.stringify([query, variables]);
+  const cached = catalogCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.results;
+
+  const results = (await fetchAniList(query, variables)).map(mapMediaToResult);
+  catalogCache.delete(key);
+  if (catalogCache.size >= MAX_CATALOG_CACHE_ENTRIES) {
+    const oldest = catalogCache.keys().next().value;
+    if (oldest !== undefined) catalogCache.delete(oldest);
+  }
+  catalogCache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, results });
+  return results;
 }
 
 export async function searchManga(query: string): Promise<MangaResult[]> {
-  if (!query || query.trim().length === 0) return [];
-  const media = await fetchAniList(SEARCH_QUERY, { search: query });
-  return media.map(mapMediaToResult);
+  const search = query.trim();
+  return search ? fetchCachedCatalog(SEARCH_QUERY, { search }) : [];
 }
 
 export type BrowseSort = "trending" | "popular" | "top-rated";
@@ -219,11 +244,10 @@ export async function getBrowseManga(
   sort: BrowseSort,
   genre?: string
 ): Promise<MangaResult[]> {
-  const media = await fetchAniList(BROWSE_QUERY, {
+  return fetchCachedCatalog(BROWSE_QUERY, {
     sort: SORT_MAP[sort],
     genre: genre && genre !== "All" ? genre : null,
   });
-  return media.map(mapMediaToResult);
 }
 
 /**
@@ -244,7 +268,7 @@ export async function getMediaRecommendations(
     const nodes = data?.Media?.recommendations?.nodes ?? [];
     return nodes
       .map((n) => n.mediaRecommendation)
-      .filter((m): m is AniListMedia => m != null)
+      .filter(isNonAdultMedia)
       .map(mapMediaToResult);
   } catch {
     return [];
@@ -255,11 +279,14 @@ export interface CandidatePoolFilters {
   genres: string[];
   completionStatus: string; // "any" | "ongoing" | "completed"
   chapterLength: string; // "any" | "short" | "medium" | "long"
+  contentRating?: string;
   page?: number; // 1-based; bump it to pull a fresh batch instead of re-ranking round 1's leftovers
 }
 
 const ARG_TYPES: Record<string, string> = {
   genre: "String",
+  genre_in: "[String]",
+  genre_not_in: "[String]",
   tag_in: "[String]",
   status_in: "[MediaStatus]",
   sort: "[MediaSort]",
@@ -317,23 +344,31 @@ export async function getCandidatePool(
   filters: CandidatePoolFilters
 ): Promise<MangaResult[]> {
   const status = anilistStatusList(filters.completionStatus);
+  const { contentRating = "any" } = filters;
   const page = Math.max(1, Math.floor(filters.page ?? 1));
 
   const currentYear = new Date().getFullYear();
   const recentCutoff = (currentYear - 2) * 10000 + 101; // e.g. 20240101
 
   function buildRequest(selection: string | null, recentOnly: boolean) {
-    const activeArgs = ["sort"];
-    const vars: Record<string, unknown> = { page, sort: ["POPULARITY_DESC"] };
+    const activeArgs = ["sort", "genre_not_in"];
+    const vars: Record<string, unknown> = {
+      page,
+      sort: ["POPULARITY_DESC"],
+      genre_not_in: contentRating === "safe" ? ["Hentai", "Ecchi"] : ["Hentai"],
+    };
 
-    if (selection) {
-      if (isGenre(selection)) {
-        activeArgs.push("genre");
-        vars.genre = selection;
-      } else {
-        activeArgs.push("tag_in");
-        vars.tag_in = [selection];
-      }
+    const selectedGenre = selection && isGenre(selection) ? selection : null;
+    if (contentRating === "mature" && selectedGenre && selectedGenre !== "Ecchi") {
+      activeArgs.push("genre_in");
+      vars.genre_in = ["Ecchi", selectedGenre];
+    } else if (contentRating === "mature" || selectedGenre) {
+      activeArgs.push("genre");
+      vars.genre = contentRating === "mature" ? "Ecchi" : selectedGenre;
+    }
+    if (selection && !selectedGenre) {
+      activeArgs.push("tag_in");
+      vars.tag_in = [selection];
     }
     if (status) {
       activeArgs.push("status_in");
@@ -347,7 +382,9 @@ export async function getCandidatePool(
     return { query: buildCandidateQuery(activeArgs), variables: vars };
   }
 
-  const selections = filters.genres.slice(0, MAX_SELECTIONS_QUERIED);
+  const selections = filters.genres
+    .filter((genre) => contentRating !== "safe" || genre !== "Ecchi")
+    .slice(0, MAX_SELECTIONS_QUERIED);
   const requests =
     selections.length > 0
       ? [
@@ -373,8 +410,10 @@ export async function getCandidatePool(
     for (const batch of batches) {
       const item = batch[i];
       if (!item || seen.has(item.id)) continue;
+      const candidate = mapMediaToResult(item);
+      if (!matchesContentRating(candidate.genres, contentRating)) continue;
       seen.add(item.id);
-      merged.push(mapMediaToResult(item));
+      merged.push(candidate);
       if (merged.length >= MAX_POOL_SIZE) return merged;
     }
   }

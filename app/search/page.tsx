@@ -15,6 +15,7 @@ import ResultsHeader from "@/components/ResultsHeader";
 import {
   addMangaToLibrary,
   fetchCategories,
+  fetchLibrary,
   setMangaCategory,
 } from "@/lib/api-client";
 import { fetchJson } from "@/lib/http";
@@ -44,9 +45,19 @@ export default function SearchPage() {
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
 
   useEffect(() => {
-    fetchCategories()
-      .then(setCategories)
-      .catch(() => setCategories([]));
+    let active = true;
+
+    async function loadLibraryContext() {
+      const library = await fetchLibrary().catch(() => []);
+      if (!active) return;
+      setAddedIds((previous) => new Set([...previous, ...library.map((manga) => manga.anilistId)]));
+
+      const sessionCategories = await fetchCategories().catch(() => []);
+      if (active) setCategories(sessionCategories);
+    }
+
+    void loadLibraryContext();
+    return () => { active = false; };
   }, []);
 
   const [browseTab, setBrowseTab] = useState<BrowseSort>("trending");

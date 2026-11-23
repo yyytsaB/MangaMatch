@@ -36,22 +36,22 @@
 
 Write failing Vitest regression tests for each item before implementing:
 
-- [ ] **Fix base-manga community recs being sliced off** (`app/api/recommend/route.ts:74-116`): interleave or prioritize `getMediaRecommendations()` candidates at the front of the pool before slicing to 25.
-- [ ] **Include chapter counts in Gemini candidate rows** (`lib/gemini.ts:95-101`) so the prompt's chapter-length instruction actually works.
-- [ ] **Wire `contentRating` cleanly (resolved via `FOG-1`):** keep `isAdult: false` on all AniList queries (never pure adult/Hentai); `"safe"` excludes `Ecchi` & `Hentai`; `"any"` is unrestricted non-adult; `"mature"` targets borderline/Ecchi manga (ensure Ecchi candidates are queried/prioritized in `getCandidatePool` & prompt while still excluding `Hentai` / `isAdult: true`).
-- [ ] **Fix "Yes, Add as Completed" saving as `"planning"`** (`app/api/manga/add/route.ts` + `app/recommendations/page.tsx:169-196`): accept validated optional `readingStatus` on add (default `"planning"`) and pass `"completed"` from the Already Read modal.
-- [ ] **Preserve full metadata when saving recommendations** (`app/api/recommend/route.ts:138-149` + `app/recommendations/page.tsx:137-151`): include `authors`, `publishedFrom`, `publishedTo`, `volumes`, and `score` in recommendation responses and pass them to `addMangaToLibrary()`.
-- [ ] **Fix starter-pack data drift & sorting bugs:**
-  - [ ] Trim items in `parseList()` (`lib/manga.ts`) and normalize `lib/starter-data.ts` genres (`"Action,Fantasy"`) and dates (ISO `YYYY-MM-DD`).
-  - [ ] Sort `year-newest` / `year-oldest` by parsed date/timestamp rather than raw `.localeCompare()`.
-- [ ] **Fix session bootstrap & starter-pack resurrection:**
-  - [ ] Establish a single consistent session cookie on first visit so `/` (SSR) and `/library` (client) never split into `"default"` vs UUID.
-  - [ ] Prevent `seedStarterLibraryIfEmpty()` from re-seeding after a user intentionally deletes all manga, and make seeding concurrency-safe (idempotent upsert/guard).
-- [ ] **Sync `/search` with saved library** (`app/search/page.tsx:38`): pre-populate `addedIds` from the user's library on mount; deduplicate exclusions in `/api/recommend` by `anilistId` rather than title string.
-- [ ] **API reliability & test speed:**
-  - [ ] Upgrade `lib/gemini.ts` to Gemini structured JSON output (`responseMimeType: "application/json"` + `responseSchema`).
-  - [ ] Add `AbortSignal.timeout()` to AniList & Gemini `fetch()` calls, plus short TTL caching on AniList browse/search endpoints.
-  - [ ] Use `vi.useFakeTimers()` in `tests/lib/anilist.test.ts` so the test suite runs in ~1s instead of sleeping real retry delays.
+- [x] **Fix base-manga community recs being sliced off** (`app/api/recommend/route.ts:74-116`): interleave or prioritize `getMediaRecommendations()` candidates at the front of the pool before slicing to 25.
+- [x] **Include chapter counts in Gemini candidate rows** (`lib/gemini.ts:95-101`) so the prompt's chapter-length instruction actually works.
+- [x] **Wire `contentRating` cleanly (resolved via `FOG-1`):** keep `isAdult: false` on all AniList queries (never pure adult/Hentai); `"safe"` excludes `Ecchi` & `Hentai`; `"any"` is unrestricted non-adult; `"mature"` targets borderline/Ecchi manga (ensure Ecchi candidates are queried/prioritized in `getCandidatePool` & prompt while still excluding `Hentai` / `isAdult: true`).
+- [x] **Fix "Yes, Add as Completed" saving as `"planning"`** (`app/api/manga/add/route.ts` + `app/recommendations/page.tsx:169-196`): accept validated optional `readingStatus` on add (default `"planning"`) and pass `"completed"` from the Already Read modal.
+- [x] **Preserve full metadata when saving recommendations** (`app/api/recommend/route.ts:138-149` + `app/recommendations/page.tsx:137-151`): include `authors`, `publishedFrom`, `publishedTo`, `volumes`, and `score` in recommendation responses and pass them to `addMangaToLibrary()`.
+- [x] **Fix starter-pack data drift & sorting bugs:**
+  - [x] Trim items in `parseList()` (`lib/manga.ts`) and normalize `lib/starter-data.ts` genres (`"Action,Fantasy"`) and dates (ISO `YYYY-MM-DD`).
+  - [x] Sort `year-newest` / `year-oldest` by parsed date/timestamp rather than raw `.localeCompare()`.
+- [x] **Fix session bootstrap & starter-pack resurrection:**
+  - [x] Establish a single consistent session cookie on first visit so `/` (SSR) and `/library` (client) never split into `"default"` vs UUID.
+  - [x] Prevent `seedStarterLibraryIfEmpty()` from re-seeding after a user intentionally deletes all manga, and make seeding concurrency-safe (idempotent upsert/guard).
+- [x] **Sync `/search` with saved library** (`app/search/page.tsx:38`): pre-populate `addedIds` from the user's library on mount; deduplicate exclusions in `/api/recommend` by `anilistId` rather than title string.
+- [x] **API reliability & test speed:**
+  - [x] Upgrade `lib/gemini.ts` to Gemini structured JSON output (`responseMimeType: "application/json"` + `responseSchema`).
+  - [x] Add `AbortSignal.timeout()` to AniList & Gemini `fetch()` calls, plus short TTL caching on AniList browse/search endpoints.
+  - [x] Use `vi.useFakeTimers()` in `tests/lib/anilist.test.ts` so the test suite runs in ~1s instead of sleeping real retry delays.
 
 **Exit Gate:** Every bug has a regression test; all 4 CI gates green.
 

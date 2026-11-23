@@ -11,7 +11,7 @@ export interface StarterManga {
   rating: number;
   authors: string;
   publishedFrom: string;
-  publishedTo: string;
+  publishedTo: string | null;
   chapters: number | null;
   volumes: number | null;
   malScore: number;
@@ -30,15 +30,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 172619,
     title: "The Extra’s Academy Survival Guide",
-    genres: "Action, Fantasy",
+    genres: "Action,Fantasy",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx172619-LSoXY45QAas4.jpg",
     synopsis: "Ed Rothstaylor is a third-rate villain in a game, disowned by his family and kicked out of the dormitory for his misdeeds. One day, our main character wakes up as this very Ed, and realizes he must earn a scholarship so he can graduate and be set for life.",
     publicationStatus: "RELEASING",
     readingStatus: "reading",
     rating: 9,
     authors: "Green Kyrin",
-    publishedFrom: "December 28, 2023",
-    publishedTo: "Unknown",
+    publishedFrom: "2023-12-28",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 8.2,
@@ -48,15 +48,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 119257,
     title: "Omniscient Reader",
-    genres: "Action, Adventure, Fantasy",
+    genres: "Action,Adventure,Fantasy",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx119257-Pi21aq3ey9GG.jpg",
     synopsis: "Back then, Dok-Ja had no idea. He had no idea his favorite web novel 'Three Ways to Survive the Apocalypse' was going to come to life, and that he would become the only person to know how the world was going to end.",
     publicationStatus: "RELEASING",
     readingStatus: "reading",
     rating: 10,
-    authors: "sing N song, Sleepy-C, UMI",
-    publishedFrom: "May 26, 2020",
-    publishedTo: "Unknown",
+    authors: "sing N song,Sleepy-C,UMI",
+    publishedFrom: "2020-05-26",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 8.8,
@@ -66,15 +66,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 118586,
     title: "Sousou no Frieren",
-    genres: "Adventure, Drama, Fantasy",
+    genres: "Adventure,Drama,Fantasy",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx118586-CXKgWikBFQgS.jpg",
     synopsis: "The adventure is over but life goes on for an elf mage just beginning to learn what living is all about. Elf mage Frieren and her courageous fellow adventurers have defeated the Demon King and brought peace to the land.",
     publicationStatus: "RELEASING",
     readingStatus: "completed",
     rating: 10,
-    authors: "Kanehito Yamada, Tsukasa Abe",
-    publishedFrom: "April 28, 2020",
-    publishedTo: "Unknown",
+    authors: "Kanehito Yamada,Tsukasa Abe",
+    publishedFrom: "2020-04-28",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 8.9,
@@ -84,15 +84,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 105398,
     title: "Solo Leveling",
-    genres: "Action, Adventure, Fantasy",
+    genres: "Action,Adventure,Fantasy",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx105398-b673Vt5ZSuz3.jpg",
     synopsis: "10 years ago, after 'the Gate' that connected the real world with the monster world opened, some of the ordinary, everyday people received the power to hunt monsters within the Gate. They are known as 'Hunters'.",
     publicationStatus: "FINISHED",
     readingStatus: "completed",
     rating: 9,
-    authors: "Chugong, DUBU",
-    publishedFrom: "March 4, 2018",
-    publishedTo: "December 29, 2021",
+    authors: "Chugong,DUBU",
+    publishedFrom: "2018-03-04",
+    publishedTo: "2021-12-29",
     chapters: 179,
     volumes: 14,
     malScore: 8.7,
@@ -102,15 +102,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 86082,
     title: "Dungeon Meshi",
-    genres: "Adventure, Comedy, Fantasy",
+    genres: "Adventure,Comedy,Fantasy",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx86082-MXizJxzbijdd.jpg",
     synopsis: "What do you get when you cross dungeon adventures and food manga? You get Delicious in Dungeon, where we find our troupe of adventurers on a mission to save their lost teammate while figuring out how to survive on the food that the dungeon provides.",
     publicationStatus: "FINISHED",
     readingStatus: "completed",
     rating: 10,
     authors: "Ryoko Kui",
-    publishedFrom: "February 15, 2014",
-    publishedTo: "September 15, 2023",
+    publishedFrom: "2014-02-15",
+    publishedTo: "2023-09-15",
     chapters: 97,
     volumes: 14,
     malScore: 8.9,
@@ -120,15 +120,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 106758,
     title: "The Eminence in Shadow",
-    genres: "Action, Comedy, Fantasy",
+    genres: "Action,Comedy,Fantasy",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx106758-jtXpQYQqyNJv.jpg",
     synopsis: "Just as everyone has had childhood dreams of becoming a superhero, Cid Kagenou dreams of becoming a mastermind operating from the shadows.",
     publicationStatus: "RELEASING",
     readingStatus: "reading",
     rating: 8,
-    authors: "Daisuke Aizawa, Anri Sakano",
-    publishedFrom: "December 26, 2018",
-    publishedTo: "Unknown",
+    authors: "Daisuke Aizawa,Anri Sakano",
+    publishedFrom: "2018-12-26",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 8.1,
@@ -138,15 +138,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 105778,
     title: "Chainsaw Man",
-    genres: "Action, Comedy, Drama, Horror, Supernatural",
+    genres: "Action,Comedy,Drama,Horror,Supernatural",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx105778-euxXZEIfDY2u.png",
     synopsis: "Denji has a simple dream—to live a happy and peaceful life, spending time with a girl he likes. This is a far cry from reality, however, as Denji is forced by the yakuza into killing devils in order to pay off his crushing debts.",
     publicationStatus: "RELEASING",
     readingStatus: "reading",
     rating: 9,
     authors: "Tatsuki Fujimoto",
-    publishedFrom: "December 3, 2018",
-    publishedTo: "Unknown",
+    publishedFrom: "2018-12-03",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 8.6,
@@ -156,15 +156,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 30002,
     title: "Berserk",
-    genres: "Action, Adventure, Drama, Fantasy, Horror, Psychological",
+    genres: "Action,Adventure,Drama,Fantasy,Horror,Psychological",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx30002-Cul4OeN7bYtn.jpg",
     synopsis: "Guts, a man who calls himself 'The Black Swordsman', looks upon his days serving as the member of a group of mercenaries, the Band of the Hawk, and the terrifying journey of vengeance that follows.",
     publicationStatus: "RELEASING",
     readingStatus: "reading",
     rating: 10,
-    authors: "Kentaro Miura, Studio Gaga",
-    publishedFrom: "August 25, 1989",
-    publishedTo: "Unknown",
+    authors: "Kentaro Miura,Studio Gaga",
+    publishedFrom: "1989-08-25",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 9.4,
@@ -174,15 +174,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 101517,
     title: "Jujutsu Kaisen",
-    genres: "Action, Drama, Supernatural",
+    genres: "Action,Drama,Supernatural",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx101517-H3TdM3g5ZUe9.jpg",
     synopsis: "Although Yuji Itadori looks like your average teenager, his immense physical strength is something to behold! Every sports club wants him to join, but Itadori would rather hang out with the school outcasts in the Occult Club.",
     publicationStatus: "FINISHED",
     readingStatus: "completed",
     rating: 8,
     authors: "Gege Akutami",
-    publishedFrom: "March 5, 2018",
-    publishedTo: "September 30, 2024",
+    publishedFrom: "2018-03-05",
+    publishedTo: "2024-09-30",
     chapters: 271,
     volumes: 30,
     malScore: 8.4,
@@ -192,15 +192,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 108556,
     title: "SPY x FAMILY",
-    genres: "Action, Comedy, Supernatural",
+    genres: "Action,Comedy,Supernatural",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx108556-NHjkz0BNJhLx.jpg",
     synopsis: "Master spy Twilight is the best at what he does when it comes to going undercover on dangerous missions in the name of a better world. But when he receives the ultimate impossible assignment—get married and have a kid—he may finally be in over his head!",
     publicationStatus: "RELEASING",
     readingStatus: "reading",
     rating: 9,
     authors: "Tatsuya Endou",
-    publishedFrom: "March 25, 2019",
-    publishedTo: "Unknown",
+    publishedFrom: "2019-03-25",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 8.6,
@@ -210,15 +210,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 159441,
     title: "Pick Me Up",
-    genres: "Action, Adventure, Fantasy",
+    genres: "Action,Adventure,Fantasy",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx159441-9W8201jAT9Yv.jpg",
     synopsis: "In the impossibly difficult mobile gacha game 'Pick Me Up', master ranker Loki wakes up as a 1-star disposable hero Han Yslat inside the game world. To survive, he must climb the 100-floor Master Tower.",
     publicationStatus: "RELEASING",
     readingStatus: "reading",
     rating: 9,
-    authors: "Hermit, Ntree",
-    publishedFrom: "December 27, 2022",
-    publishedTo: "Unknown",
+    authors: "Hermit,Ntree",
+    publishedFrom: "2022-12-27",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 8.4,
@@ -228,15 +228,15 @@ export const STARTER_MANGA: StarterManga[] = [
   {
     anilistId: 106130,
     title: "Blue Lock",
-    genres: "Action, Drama, Sports",
+    genres: "Action,Drama,Sports",
     coverUrl: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx106130-yPNeuSu75ey1.jpg",
     synopsis: "After a disastrous defeat at the 2018 World Cup, Japan's team struggles to regroup. But what's missing? An absolute Ace Striker, who can guide them to the win. The Japan Football Union is hell-bent on creating a striker who hungers for goals.",
     publicationStatus: "RELEASING",
     readingStatus: "planning",
     rating: 8,
-    authors: "Muneyuki Kaneshiro, Yuusuke Nomura",
-    publishedFrom: "August 1, 2018",
-    publishedTo: "Unknown",
+    authors: "Muneyuki Kaneshiro,Yuusuke Nomura",
+    publishedFrom: "2018-08-01",
+    publishedTo: null,
     chapters: null,
     volumes: null,
     malScore: 8.3,
@@ -246,66 +246,38 @@ export const STARTER_MANGA: StarterManga[] = [
 ];
 
 /**
- * Seeds the starter dataset for a brand new session ID if it has 0 manga.
+ * Initializes each session once, even if the reader later empties their shelf.
  */
 export async function seedStarterLibraryIfEmpty(sessionId: string): Promise<void> {
-  if (!sessionId) return;
+  if (!sessionId || await prisma.starterLibrary.findUnique({ where: { sessionId } })) return;
 
-  const count = await prisma.manga.count({
-    where: { sessionId },
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.starterLibrary.create({ data: { sessionId } });
+      if (await tx.manga.count({ where: { sessionId } }) > 0) return;
 
-  if (count > 0) return;
+      for (const { name, color } of STARTER_CATEGORIES) {
+        await tx.category.upsert({
+          where: { sessionId_name: { sessionId, name } },
+          update: {},
+          create: { sessionId, name, color },
+        });
+      }
 
-  // 1. Create categories for this session
-  const categoryMap = new Map<string, number>();
-  for (const cat of STARTER_CATEGORIES) {
-    const created = await prisma.category.upsert({
-      where: {
-        sessionId_name: {
-          sessionId,
-          name: cat.name,
-        },
-      },
-      update: {},
-      create: {
-        sessionId,
-        name: cat.name,
-        color: cat.color,
-      },
-    });
-    categoryMap.set(cat.name, created.id);
-  }
-
-  // 2. Insert starter manga
-  for (const item of STARTER_MANGA) {
-    const categoryConnect = item.categoryNames
-      .map((name) => categoryMap.get(name))
-      .filter((id): id is number => id !== undefined)
-      .map((id) => ({ id }));
-
-    await prisma.manga.create({
-      data: {
-        sessionId,
-        anilistId: item.anilistId,
-        title: item.title,
-        genres: item.genres,
-        coverUrl: item.coverUrl,
-        synopsis: item.synopsis,
-        publicationStatus: item.publicationStatus,
-        readingStatus: item.readingStatus,
-        rating: item.rating,
-        authors: item.authors,
-        publishedFrom: item.publishedFrom,
-        publishedTo: item.publishedTo,
-        chapters: item.chapters,
-        volumes: item.volumes,
-        malScore: item.malScore,
-        siteUrl: item.siteUrl,
-        categories: {
-          connect: categoryConnect,
-        },
-      },
-    });
+      for (const { categoryNames, ...manga } of STARTER_MANGA) {
+        await tx.manga.create({
+          data: {
+            ...manga,
+            sessionId,
+            categories: {
+              connect: categoryNames.map((name) => ({ sessionId_name: { sessionId, name } })),
+            },
+          },
+        });
+      }
+    }, { timeout: 15_000 });
+  } catch (error) {
+    if (typeof error !== "object" || error === null || !("code" in error) || error.code !== "P2002" ||
+        !await prisma.starterLibrary.findUnique({ where: { sessionId } })) throw error;
   }
 }

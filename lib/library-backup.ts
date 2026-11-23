@@ -8,6 +8,7 @@ import {
   parseId,
   parseOptionalInteger,
   parseOptionalNumber,
+  parsePublicationDate,
   parseString,
   parseStringArray,
 } from "@/lib/validation";
@@ -22,25 +23,6 @@ function parseCommaList(value: unknown) {
   if (typeof value !== "string" || value.length > MAX_TEXT_LENGTH) return null;
   const parts = parseStringArray(value.split(","), MAX_TITLE_LENGTH);
   return parts?.map((part) => part.trim()).filter(Boolean).join(",") ?? null;
-}
-
-function parseDate(value: unknown) {
-  const date = parseString(value, 32);
-  if (!date) return null;
-  const isoFormat = /^\d{4}-\d{2}-\d{2}$/;
-  const legacyFormat = /^[A-Za-z]+ \d{1,2}, \d{4}$/;
-  if (!isoFormat.test(date) && !legacyFormat.test(date)) return null;
-
-  const time = new Date(isoFormat.test(date) ? `${date}T00:00:00Z` : `${date} UTC`);
-  if (!Number.isFinite(time.getTime())) return null;
-  const iso = time.toISOString().slice(0, 10);
-  if (isoFormat.test(date)) return iso === date ? iso : null;
-
-  // Backups from the original starter library used English month names.
-  const legacy = time.toLocaleDateString("en-US", {
-    timeZone: "UTC", month: "long", day: "numeric", year: "numeric",
-  });
-  return legacy === date ? iso : null;
 }
 
 function parseManga(value: unknown) {
@@ -61,8 +43,8 @@ function parseManga(value: unknown) {
   const siteUrl = optionalField(value.siteUrl, parseHttpUrl);
   const synopsis = optionalField(value.synopsis, (input) => parseString(input, MAX_TEXT_LENGTH));
   const publicationStatus = optionalField(value.publicationStatus, (input) => parseString(input, MAX_TITLE_LENGTH));
-  const publishedFrom = optionalField(value.publishedFrom === "Unknown" ? null : value.publishedFrom, parseDate);
-  const publishedTo = optionalField(value.publishedTo === "Unknown" ? null : value.publishedTo, parseDate);
+  const publishedFrom = optionalField(value.publishedFrom === "Unknown" ? null : value.publishedFrom, parsePublicationDate);
+  const publishedTo = optionalField(value.publishedTo === "Unknown" ? null : value.publishedTo, parsePublicationDate);
   const chapters = optionalField(value.chapters, parseOptionalInteger);
   const volumes = optionalField(value.volumes, parseOptionalInteger);
   const malScore = optionalField(value.malScore, parseOptionalNumber);

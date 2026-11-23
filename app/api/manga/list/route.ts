@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { serverError } from "@/lib/api";
-import { getSessionId, SESSION_COOKIE } from "@/lib/session";
+import { getSessionId } from "@/lib/session";
 import { seedStarterLibraryIfEmpty } from "@/lib/starter-data";
 
 export async function GET(req: NextRequest) {
@@ -19,16 +19,7 @@ export async function GET(req: NextRequest) {
       include: { categories: { where: { sessionId } } },
     });
 
-    const response = NextResponse.json({ manga });
-    
-    // Ensure cookie is set for the client
-    response.cookies.set(SESSION_COOKIE, sessionId, {
-      path: "/",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365, // 1 year
-    });
-
-    return response;
+    return NextResponse.json({ manga });
   } catch (err) {
     return serverError(err, "Failed to load library");
   }

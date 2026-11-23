@@ -76,8 +76,8 @@ describe("POST /api/recommend", () => {
   it.each([
     { field: "customQuery", value: "x".repeat(5001) },
     { field: "genres", value: Array(51).fill("Action") },
-    { field: "excludeTitles", value: Array(501).fill("Manga") },
-    { field: "excludeTitles", value: [42] },
+    { field: "excludeAnilistIds", value: Array(501).fill(42) },
+    { field: "excludeAnilistIds", value: [0] },
     { field: "baseMangaIds", value: Array(51).fill(3) },
     { field: "baseMangaIds", value: [2_147_483_648] },
     { field: "completionStatus", value: "other" },
@@ -95,6 +95,9 @@ describe("POST /api/recommend", () => {
   });
 
   it("maps ranked picks back onto the real candidate data", async () => {
+    getCandidatePool.mockResolvedValue([manga({
+      authors: ["Author"], publishedFrom: "2020-01-02", publishedTo: "2021-03-04", volumes: 7,
+    })]);
     const res = await POST(request());
 
     expect(res.status).toBe(200);
@@ -107,7 +110,12 @@ describe("POST /api/recommend", () => {
           anilistId: 1,
           coverUrl: "https://img/1.jpg",
           genres: ["Action"],
+          authors: ["Author"],
+          publishedFrom: "2020-01-02",
+          publishedTo: "2021-03-04",
           chapters: 50,
+          volumes: 7,
+          score: 8,
           status: "FINISHED",
           siteUrl: "https://anilist.co/manga/1",
         },
@@ -122,12 +130,14 @@ describe("POST /api/recommend", () => {
       genres: [],
       completionStatus: "any",
       chapterLength: "any",
+      contentRating: "any",
       page: 1,
     });
     expect(rankCandidates.mock.calls[0][1]).toEqual({
       genres: [],
       completionStatus: "any",
       chapterLength: "any",
+      contentRating: "any",
       baseManga: [],
       diverge: false,
       customQuery: "",
@@ -166,7 +176,7 @@ describe("POST /api/recommend", () => {
           synopsis: "Dark fantasy",
         },
       ])
-      .mockResolvedValueOnce([{ title: "Berserk" }]);
+      .mockResolvedValueOnce([{ anilistId: 999, title: "Berserk" }]);
 
     await POST(request({ baseMangaIds: ["3"] }));
 
@@ -186,45 +196,48 @@ describe("POST /api/recommend", () => {
     expect(getMediaRecommendations).not.toHaveBeenCalled();
   });
 
-  it("merges community recommendations into the pool, de-duplicated by id", async () => {
+  it("prioritizes community recommendations before truncating a full pool, without duplicating ids", async () => {
     findMany
       .mockResolvedValueOnce([
         { id: 3, anilistId: 999, title: "Berserk", genres: "", synopsis: null },
       ])
       .mockResolvedValueOnce([]);
-    getMediaRecommendations.mockResolvedValue([
-      manga({ anilistId: 1, title: "Duplicate of pool" }),
-      manga({ anilistId: 2, title: "Community pick" }),
-    ]);
+    getCandidatePool.mockResolvedValue(Array.from({ length: 30 }, (_, index) =>
+      manga({ anilistId: index + 1 })
+    ));
+    getMediaRecommendations.mockResolvedValue([manga({ anilistId: 70 }), manga({ anilistId: 1 })]);
 
     await POST(request({ baseMangaIds: [3] }));
 
     const candidates = rankCandidates.mock.calls[0][0];
-    expect(candidates.map((c: { anilistId: number }) => c.anilistId)).toEqual([1, 2]);
-    expect(candidates[0].title).toBe("Candidate 1");
+    const ids = candidates.map((candidate: MangaResult) => candidate.anilistId);
+    expect(ids[0]).toBe(70);
+    expect(ids).toHaveLength(25);
+    expect(new Set(ids).size).toBe(25);
   });
 
-  it("excludes titles already in the library, case-insensitively", async () => {
+  it("excludes library ids even after a rename, but retains distinct manga with the same title", async () => {
     getCandidatePool.mockResolvedValue([
-      manga({ anilistId: 1, title: "Berserk" }),
-      manga({ anilistId: 2, title: "Vagabond" }),
+      manga({ anilistId: 1, title: "New title" }),
+      manga({ anilistId: 2, title: "Old title" }),
     ]);
-    findMany.mockResolvedValue([{ title: "bErSeRk" }]);
+    findMany.mockResolvedValue([{ anilistId: 1, title: "Old title" }]);
 
     await POST(request());
 
     expect(
       rankCandidates.mock.calls[0][0].map((c: { title: string }) => c.title)
-    ).toEqual(["Vagabond"]);
+    ).toEqual(["Old title"]);
+    expect(findMany).toHaveBeenCalledWith({ where: { sessionId: "default" }, select: { anilistId: true } });
   });
 
-  it("excludes titles the client has already seen", async () => {
+  it("excludes ids the client has already seen", async () => {
     getCandidatePool.mockResolvedValue([
       manga({ anilistId: 1, title: "Berserk" }),
       manga({ anilistId: 2, title: "Vagabond" }),
     ]);
 
-    await POST(request({ excludeTitles: ["VAGABOND"] }));
+    await POST(request({ excludeAnilistIds: [2, 2] }));
 
     expect(
       rankCandidates.mock.calls[0][0].map((c: { title: string }) => c.title)
@@ -288,15 +301,21 @@ describe("POST /api/recommend", () => {
     ).toEqual(["Safe"]);
   });
 
-  it("keeps adult genres when contentRating is unrestricted", async () => {
-    getCandidatePool.mockResolvedValue([
-      manga({ anilistId: 2, title: "Ecchi pick", genres: ["Ecchi"] }),
-    ]);
+  it.each([["any", [2, 1]], ["mature", [1]]] as const)(
+    "applies %s to both community and catalog candidates", async (contentRating, expected) => {
+      findMany.mockResolvedValueOnce([{ anilistId: 999, title: "Base", genres: "", synopsis: null }]);
+      getMediaRecommendations.mockResolvedValue([
+        manga({ anilistId: 2 }), manga({ anilistId: 3, genres: ["Hentai", "Ecchi"] }),
+      ]);
+      getCandidatePool.mockResolvedValue([manga({ anilistId: 1, genres: ["Ecchi"] })]);
 
-    await POST(request({ contentRating: "any" }));
+      await POST(request({ baseMangaIds: [3], contentRating }));
 
-    expect(rankCandidates.mock.calls[0][0]).toHaveLength(1);
-  });
+      expect(rankCandidates.mock.calls[0][0].map((candidate: MangaResult) => candidate.anilistId)).toEqual(expected);
+      expect(rankCandidates.mock.calls[0][1]).toMatchObject({ contentRating });
+      expect(getCandidatePool).toHaveBeenCalledWith(expect.objectContaining({ contentRating }));
+    }
+  );
 
   it("returns an explanatory note instead of calling Gemini when nothing matches", async () => {
     getCandidatePool.mockResolvedValue([manga({ chapters: 500 })]);

@@ -19,6 +19,7 @@ export interface RankingFilters {
   genres: string[];
   completionStatus: string;
   chapterLength: string;
+  contentRating?: string;
   baseManga: {
     title: string;
     genres: string[];
@@ -59,6 +60,11 @@ export function buildPrompt(
       `Preferred chapter length: ${filters.chapterLength}. Use the chapters count shown per candidate where available.`
     );
   }
+  if (filters.contentRating === "mature") {
+    parts.push("Prioritize Ecchi manga that fit the requested themes. Exclude Hentai and adult-only titles.");
+  } else if (filters.contentRating === "safe") {
+    parts.push("Exclude Ecchi, Hentai, and adult-only titles.");
+  }
 
   if (filters.baseManga.length > 0) {
     const baseDescriptions = filters.baseManga
@@ -96,7 +102,7 @@ export function buildPrompt(
     parts.push(
       `${i}. "${c.title}" | Genres/Themes: ${c.genres.join(", ")} | Status: ${
         c.status ?? "unknown"
-      } | Score: ${c.score ?? "N/A"}/10 | Synopsis: ${(c.synopsis ?? "").slice(0, 160)}`
+      } | Chapters: ${c.chapters ?? "unknown"} | Score: ${c.score ?? "N/A"}/10 | Synopsis: ${(c.synopsis ?? "").slice(0, 160)}`
     );
   });
 
@@ -104,7 +110,7 @@ export function buildPrompt(
     "\nRespond ONLY with a JSON array, no other text, no markdown code fences. " +
       'Each item must have this exact shape: { "index": number, "reason": string }, where "index" is the candidate\'s number from the list above. ' +
       '"reason" should briefly explain why this pick fits, referencing the requested genres/themes. ' +
-      "Return exactly 5 items, ranked best-first, using only indices from the list."
+      "Return up to 5 items, ranked best-first, using only indices from the list."
   );
 
   return parts.join("\n");
@@ -126,8 +132,21 @@ export async function rankCandidates(
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(20_000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "ARRAY",
+            maxItems: 5,
+            items: {
+              type: "OBJECT",
+              properties: { index: { type: "INTEGER" }, reason: { type: "STRING" } },
+              required: ["index", "reason"],
+            },
+          },
+        },
       }),
     }
   );
@@ -145,11 +164,9 @@ export async function rankCandidates(
     throw new Error("Gemini returned no content");
   }
 
-  const cleaned = text.replace(/```json|```/g, "").trim();
-
   let parsed: unknown;
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(text);
   } catch {
     throw new Error("Failed to parse Gemini response as JSON");
   }
@@ -167,6 +184,7 @@ export async function rankCandidates(
       typeof item === "object" &&
       item !== null &&
       typeof item.index === "number" &&
+      Number.isInteger(item.index) &&
       typeof item.reason === "string" &&
       item.index >= 0 &&
       item.index < candidates.length &&
