@@ -4,13 +4,14 @@ import { NextRequest } from "next/server";
 const categoryFindMany = vi.fn();
 const mangaFindMany = vi.fn();
 const txDeleteMany = vi.fn();
+const txCategoryDeleteMany = vi.fn();
 const txCategoryFindUnique = vi.fn();
 const txCategoryCreate = vi.fn();
+const txCategoryUpdate = vi.fn();
 const txMangaFindUnique = vi.fn();
 const txMangaUpdate = vi.fn();
 const txMangaCreate = vi.fn();
-const txCallback = vi.fn(async (cb: any) => {
-  return cb({
+const tx = {
     manga: {
       deleteMany: txDeleteMany,
       findUnique: txMangaFindUnique,
@@ -18,17 +19,19 @@ const txCallback = vi.fn(async (cb: any) => {
       create: txMangaCreate,
     },
     category: {
+      deleteMany: txCategoryDeleteMany,
       findUnique: txCategoryFindUnique,
       create: txCategoryCreate,
+      update: txCategoryUpdate,
     },
-  });
-});
+};
+const txCallback = vi.fn(async (cb: (client: typeof tx) => Promise<unknown>) => cb(tx));
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     category: { findMany: (a: unknown) => categoryFindMany(a) },
     manga: { findMany: (a: unknown) => mangaFindMany(a) },
-    $transaction: (cb: any) => txCallback(cb),
+    $transaction: (cb: (client: typeof tx) => Promise<unknown>) => txCallback(cb),
   },
 }));
 
@@ -37,6 +40,14 @@ const { POST } = await import("@/app/api/manga/import/route");
 
 function getExportRequest() {
   return new NextRequest("http://localhost/api/manga/export");
+}
+
+function importBackup(payload: unknown, sessionId = "default") {
+  return POST(new NextRequest("http://localhost/api/manga/import", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: { "x-session-id": sessionId },
+  }));
 }
 
 beforeEach(() => {
@@ -48,8 +59,10 @@ afterEach(() => {
   categoryFindMany.mockReset();
   mangaFindMany.mockReset();
   txDeleteMany.mockReset();
+  txCategoryDeleteMany.mockReset();
   txCategoryFindUnique.mockReset();
   txCategoryCreate.mockReset();
+  txCategoryUpdate.mockReset();
   txMangaFindUnique.mockReset();
   txMangaUpdate.mockReset();
   txMangaCreate.mockReset();
@@ -58,7 +71,7 @@ afterEach(() => {
 
 describe("GET /api/manga/export", () => {
   it("exports library and categories formatted as a backup JSON payload", async () => {
-    categoryFindMany.mockResolvedValue([{ id: 1, name: "Favorites" }]);
+    categoryFindMany.mockResolvedValue([{ id: 1, name: "Favorites", color: "#123ABC" }]);
     mangaFindMany.mockResolvedValue([
       {
         id: 10,
@@ -87,7 +100,7 @@ describe("GET /api/manga/export", () => {
 
     const data = await res.json();
     expect(data.version).toBe(1);
-    expect(data.categories).toEqual([{ name: "Favorites" }]);
+    expect(data.categories).toEqual([{ name: "Favorites", color: "#123ABC" }]);
     expect(data.library).toHaveLength(1);
     expect(data.library[0]).toMatchObject({
       anilistId: 30002,
@@ -106,6 +119,78 @@ describe("GET /api/manga/export", () => {
 });
 
 describe("POST /api/manga/import", () => {
+  it("returns 400 for malformed JSON", async () => {
+    const res = await POST(new NextRequest("http://localhost/api/manga/import", {
+      method: "POST",
+      body: "{",
+    }));
+    expect(res.status).toBe(400);
+    expect(txCallback).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { siteUrl: "ftp://example.com/title" },
+    { coverUrl: "file:///cover.png" },
+    { readingStatus: "unrecognized" },
+    { rating: 11 },
+    { rating: 1.5 },
+    { chapters: -1 },
+    { publishedFrom: "2025-02-30" },
+  ])("rejects invalid manga fields %j before modifying the library", async (fields) => {
+    const res = await importBackup({ mode: "replace", library: [
+      { anilistId: 1, title: "Manga", ...fields },
+    ] });
+    expect(res.status).toBe(400);
+    expect(txCallback).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized library before opening a transaction", async () => {
+    const library = Array.from({ length: 1001 }, (_, i) => ({ anilistId: i + 1, title: "Manga" }));
+    const res = await importBackup({ library });
+    expect(res.status).toBe(400);
+    expect(txCallback).not.toHaveBeenCalled();
+  });
+
+  it("restores colors for new and existing categories and prunes stale ones within the session", async () => {
+    txCategoryFindUnique.mockResolvedValueOnce({ id: 1, color: "#E8C77E" }).mockResolvedValueOnce(null);
+    txCategoryCreate.mockResolvedValue({ id: 2 });
+    const res = await importBackup({
+      mode: "replace",
+      categories: [{ name: "Favorites", color: "#123ABC" }, { name: "Classics", color: "#ABC123" }],
+      library: [],
+    }, "reader-a");
+
+    expect(res.status).toBe(200);
+    expect(txCategoryUpdate).toHaveBeenCalledWith({
+      where: { id: 1, sessionId: "reader-a" },
+      data: { color: "#123ABC" },
+    });
+    expect(txCategoryCreate).toHaveBeenCalledWith({
+      data: { sessionId: "reader-a", name: "Classics", color: "#ABC123" },
+    });
+    expect(txCategoryDeleteMany).toHaveBeenCalledWith({
+      where: { sessionId: "reader-a", name: { notIn: ["Favorites", "Classics"] } },
+    });
+  });
+
+  it("normalizes dates and comma-separated fields from older backups", async () => {
+    const res = await importBackup({ library: [{
+      anilistId: 30002,
+      title: "Manga",
+      publishedFrom: "December 28, 2023",
+      publishedTo: "Unknown",
+      genres: "Action, Fantasy",
+      authors: " Author One , Author Two ",
+    }] });
+    expect(res.status).toBe(200);
+    expect(txMangaCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
+      publishedFrom: "2023-12-28",
+      publishedTo: null,
+      genres: "Action,Fantasy",
+      authors: "Author One,Author Two",
+    }) });
+  });
+
   it("returns 400 when invalid payload is passed", async () => {
     const req = new NextRequest("http://localhost/api/manga/import", {
       method: "POST",

@@ -72,10 +72,12 @@ describe("rankCandidates", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sends the API key in the request URL", async () => {
+  it("authenticates with a request header and keeps the key out of the URL", async () => {
     await rankCandidates([candidate()], filters());
 
-    expect(String(fetchMock.mock.calls[0][0])).toContain("key=test-key");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).not.toContain("test-key");
+    expect(new Headers(init.headers).get("x-goog-api-key")).toBe("test-key");
   });
 
   it("parses the ranked picks from the response", async () => {

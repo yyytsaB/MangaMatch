@@ -10,7 +10,6 @@ import Modal from "@/components/Modal";
 import ConfirmModal from "@/components/ConfirmModal";
 import Toast from "@/components/Toast";
 import CoverImage from "@/components/CoverImage";
-import Chip from "@/components/Chip";
 import MangaCardSkeletons from "@/components/MangaCardSkeletons";
 import {
   deleteCategory,
@@ -19,7 +18,6 @@ import {
   fetchCategories,
   fetchLibrary,
   importLibrary,
-  type ImportResult,
 } from "@/lib/api-client";
 import { parseList } from "@/lib/manga";
 import type { Category, SavedManga } from "@/lib/types";

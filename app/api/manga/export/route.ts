@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
         where: { sessionId },
         include: {
           categories: {
+            where: { sessionId },
             select: { name: true },
           },
         },
@@ -25,9 +26,7 @@ export async function GET(req: NextRequest) {
     const backupData = {
       version: 1,
       exportedAt: new Date().toISOString(),
-      categories: categories.map((c) => ({
-        name: c.name,
-      })),
+      categories: categories.map(({ name, color }) => ({ name, color })),
       library: mangaList.map((m) => ({
         anilistId: m.anilistId,
         title: m.title,

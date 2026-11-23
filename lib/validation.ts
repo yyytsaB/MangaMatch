@@ -6,14 +6,17 @@
 export const MAX_TEXT_LENGTH = 5000;
 export const MAX_TITLE_LENGTH = 500;
 export const MAX_LIST_LENGTH = 50;
+const MAX_DB_INTEGER = 2_147_483_647;
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function parseId(value: string): number | null {
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : null;
+export function parseId(value: unknown): number | null {
+  const id = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+  return typeof id === "number" && Number.isInteger(id) && id > 0 && id <= MAX_DB_INTEGER
+    ? id
+    : null;
 }
 
 export function parseString(
@@ -54,16 +57,17 @@ export function parseIntegerArray(value: unknown): number[] | null {
   if (!Array.isArray(value) || value.length > MAX_LIST_LENGTH) return null;
   const out: number[] = [];
   for (const item of value) {
-    if (!Number.isInteger(item) || (item as number) <= 0) return null;
-    out.push(item as number);
+    const id = parseId(item);
+    if (id === null) return null;
+    out.push(id);
   }
   return out;
 }
 
 export function parseOptionalInteger(value: unknown): number | null {
   if (value === undefined || value === null) return null;
-  return Number.isInteger(value) && (value as number) >= 0
-    ? (value as number)
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_DB_INTEGER
+    ? value
     : null;
 }
 

@@ -9,7 +9,6 @@ import EmptyState from "@/components/EmptyState";
 import Modal from "@/components/Modal";
 import Toast from "@/components/Toast";
 import CoverImage from "@/components/CoverImage";
-import Chip from "@/components/Chip";
 import TogglePill from "@/components/TogglePill";
 import MangaCardSkeletons from "@/components/MangaCardSkeletons";
 import ResultsHeader from "@/components/ResultsHeader";
@@ -53,30 +52,36 @@ export default function SearchPage() {
   const [browseTab, setBrowseTab] = useState<BrowseSort>("trending");
   const [browseGenre, setBrowseGenre] = useState("All");
   const [browseCache, setBrowseCache] = useState<Record<string, MangaResult[]>>({});
-  const [browseLoading, setBrowseLoading] = useState(true);
   const [browseError, setBrowseError] = useState<string | null>(null);
 
   const browseKey = `${browseTab}-${browseGenre}`;
   const browseResults = browseCache[browseKey];
+  const browseLoading = !browseResults && !browseError;
 
   useEffect(() => {
-    if (browseCache[browseKey]) return;
+    if (browseResults) return;
 
-    setBrowseLoading(true);
-    setBrowseError(null);
-
+    const controller = new AbortController();
     const params = new URLSearchParams({ sort: browseTab });
     if (browseGenre !== "All") params.set("genre", browseGenre);
 
     fetchJson<{ results: MangaResult[] }>(
-      `/api/manga/trending?${params.toString()}`
+      `/api/manga/trending?${params.toString()}`,
+      { signal: controller.signal }
     )
       .then((data) => {
-        setBrowseCache((prev) => ({ ...prev, [browseKey]: data.results ?? [] }));
+        if (!controller.signal.aborted) {
+          setBrowseCache((prev) => ({ ...prev, [browseKey]: data.results ?? [] }));
+        }
       })
-      .catch((err) => setBrowseError(err.message ?? "Failed to load"))
-      .finally(() => setBrowseLoading(false));
-  }, [browseKey, browseCache, browseTab, browseGenre]);
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setBrowseError(err instanceof Error ? err.message : "Failed to load");
+        }
+      });
+
+    return () => controller.abort();
+  }, [browseKey, browseResults, browseTab, browseGenre]);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -215,7 +220,11 @@ export default function SearchPage() {
               {BROWSE_TABS.map((tab) => (
                 <button
                   key={tab.value}
-                  onClick={() => setBrowseTab(tab.value)}
+                  onClick={() => {
+                    if (tab.value === browseTab) return;
+                    setBrowseTab(tab.value);
+                    setBrowseError(null);
+                  }}
                   className={`flex items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-200 ${
                     browseTab === tab.value
                       ? "bg-[#E8C77E] font-bold text-[#0B1220] shadow-[0_0_20px_rgba(232,199,126,0.3)]"
@@ -237,7 +246,11 @@ export default function SearchPage() {
                 <TogglePill
                   key={genre}
                   active={browseGenre === genre}
-                  onClick={() => setBrowseGenre(genre)}
+                  onClick={() => {
+                    if (genre === browseGenre) return;
+                    setBrowseGenre(genre);
+                    setBrowseError(null);
+                  }}
                   className="px-3 py-1 text-[10px]"
                 >
                   {genre}
@@ -270,7 +283,7 @@ export default function SearchPage() {
               !browseError && (
                 <EmptyState>
                   <p className="text-sm text-[#8CA0BE]">
-                    No manga found for this genre. Try selecting "All".
+                    No manga found for this genre. Try selecting &quot;All&quot;.
                   </p>
                 </EmptyState>
               )
@@ -288,7 +301,7 @@ export default function SearchPage() {
               No results found
             </h3>
             <p className="mb-4 text-sm text-[#8CA0BE]">
-              We couldn't find any manga matching "{query}".
+              We couldn&apos;t find any manga matching &quot;{query}&quot;.
             </p>
             <button
               onClick={() => {
@@ -307,7 +320,7 @@ export default function SearchPage() {
           <>
             <div className="mb-6 flex items-center justify-between">
               <ResultsHeader>
-                Found {results.length} result{results.length !== 1 ? "s" : ""} for "{query}"
+                Found {results.length} result{results.length !== 1 ? "s" : ""} for &quot;{query}&quot;
               </ResultsHeader>
               <button
                 onClick={() => {

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     const manga = await prisma.manga.findMany({
       where: { sessionId },
       orderBy: { createdAt: "desc" },
-      include: { categories: true },
+      include: { categories: { where: { sessionId } } },
     });
 
     const response = NextResponse.json({ manga });

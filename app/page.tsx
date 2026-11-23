@@ -72,8 +72,8 @@ export default async function HomePage() {
             className="animate-fade-in-up mx-auto mb-10 max-w-xl text-sm leading-relaxed text-[#8CA0BE]"
             style={{ animationDelay: "0.2s" }}
           >
-            Build a library of what you're reading and what you've finished,
-            then let AI-powered recommendations point you to what's next
+            Build a library of what you&apos;re reading and what you&apos;ve finished,
+            then let AI-powered recommendations point you to what&apos;s next
             based on what you actually like.
           </p>
           <div
@@ -174,7 +174,7 @@ export default async function HomePage() {
                 Ready for something new?
               </h3>
               <p className="text-sm text-[#8CA0BE]">
-                Let our AI analyze your tastes and suggest manga you'll love, hand‑picked from your reading history.
+                Let our AI analyze your tastes and suggest manga you&apos;ll love, hand‑picked from your reading history.
               </p>
             </div>
             <Link

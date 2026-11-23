@@ -11,25 +11,51 @@ import {
   type MangaResult,
 } from "@/lib/anilist";
 import { prisma } from "@/lib/db";
-import { serverError } from "@/lib/api";
+import { badRequest, serverError } from "@/lib/api";
 import { parseList } from "@/lib/manga";
-import { matchesChapterLength, matchesCompletionStatus } from "@/lib/filters";
+import {
+  CHAPTER_LENGTH_OPTIONS,
+  COMPLETION_STATUS_OPTIONS,
+  CONTENT_RATING_OPTIONS,
+  matchesChapterLength,
+  matchesCompletionStatus,
+} from "@/lib/filters";
 import { getSessionId } from "@/lib/session";
+import {
+  MAX_TEXT_LENGTH,
+  MAX_TITLE_LENGTH,
+  parseId,
+  parseIntegerArray,
+  parseStringArray,
+  readJsonBody,
+} from "@/lib/validation";
+
+const MAX_EXCLUDED_TITLES = 500;
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await readJsonBody(req);
+  if (!body) return badRequest("Invalid JSON body");
 
   const {
-    genres = [],
     completionStatus = "any",
     chapterLength = "any",
     contentRating = "any",
-    baseMangaIds = [],
     diverge = false,
-    excludeTitles = [],
     customQuery = "",
-    page = 1,
   } = body;
+  const genres = parseStringArray(body.genres, 100);
+  const excludeTitles = parseStringArray(body.excludeTitles, MAX_TITLE_LENGTH, MAX_EXCLUDED_TITLES);
+  const baseMangaIds = parseIntegerArray(body.baseMangaIds);
+  const page = body.page === undefined ? 1 : parseId(body.page);
+
+  if (!genres || !excludeTitles || !baseMangaIds || !page ||
+      typeof customQuery !== "string" || customQuery.length > MAX_TEXT_LENGTH ||
+      typeof diverge !== "boolean" ||
+      typeof completionStatus !== "string" || !COMPLETION_STATUS_OPTIONS.some(({ value }) => value === completionStatus) ||
+      typeof chapterLength !== "string" || !CHAPTER_LENGTH_OPTIONS.some(({ value }) => value === chapterLength) ||
+      typeof contentRating !== "string" || !CONTENT_RATING_OPTIONS.some(({ value }) => value === contentRating)) {
+    return badRequest("Invalid recommendation filters");
+  }
 
   try {
     const sessionId = await getSessionId(req);
@@ -38,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     if (baseMangaIds.length > 0) {
       const mangaList = await prisma.manga.findMany({
-        where: { id: { in: baseMangaIds.map(Number) }, sessionId },
+        where: { id: { in: baseMangaIds }, sessionId },
       });
       baseManga = mangaList.map((manga) => ({
         title: manga.title,

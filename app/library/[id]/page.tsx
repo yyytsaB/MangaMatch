@@ -9,7 +9,9 @@ import AmbientBackground from "@/components/AmbientBackground";
 import CoverImage from "@/components/CoverImage";
 import Chip from "@/components/Chip";
 import { parseList } from "@/lib/manga";
+import { getSessionId } from "@/lib/session";
 import { LABEL, statusBadge } from "@/lib/ui";
+import { parseId } from "@/lib/validation";
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "Unknown";
@@ -28,9 +30,13 @@ export default async function MangaDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const mangaId = parseId(id);
+  if (!mangaId) notFound();
+
+  const sessionId = await getSessionId();
   const manga = await prisma.manga.findUnique({
-    where: { id: Number(id) },
-    include: { categories: true },
+    where: { id: mangaId, sessionId },
+    include: { categories: { where: { sessionId } } },
   });
 
   if (!manga) notFound();

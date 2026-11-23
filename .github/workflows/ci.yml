@@ -31,14 +31,17 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Push Database Schema (SQLite)
-        run: npx prisma db push --skip-generate
+      - name: Apply Database Migrations (SQLite)
+        run: npx prisma migrate deploy
 
       - name: Typecheck TypeScript
         run: npx tsc --noEmit
 
       - name: Run Test Suite (Vitest)
         run: npm test
+
+      - name: Lint
+        run: npm run lint -- --max-warnings=0
 
       - name: Build Production Application (Next.js)
         run: npm run build

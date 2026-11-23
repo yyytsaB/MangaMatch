@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 const links = [
@@ -21,9 +22,11 @@ export default function Nav() {
           href="/"
           className="group flex items-center gap-2.5 font-[family-name:var(--font-display)] text-sm font-semibold uppercase tracking-[0.15em] transition-all duration-300"
         >
-          <img
+          <Image
             src="/logo-icon.png"
-            alt="MangaMatch Icon"
+            width={28}
+            height={28}
+            alt=""
             className="h-7 w-7 rounded-lg border border-[#E8C77E]/30 object-cover shadow-[0_0_15px_rgba(232,199,126,0.2)] transition-transform duration-300 group-hover:scale-105 group-hover:border-[#E8C77E]/60"
           />
           <span className="text-gradient-gold text-base tracking-wider font-bold">MangaMatch</span>

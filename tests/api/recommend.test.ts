@@ -63,6 +63,37 @@ afterEach(() => {
 });
 
 describe("POST /api/recommend", () => {
+  it("returns 400 for malformed JSON", async () => {
+    const res = await POST(new NextRequest("http://localhost/api/recommend", {
+      method: "POST",
+      body: "{",
+    }));
+
+    expect(res.status).toBe(400);
+    expect(getCandidatePool).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { field: "customQuery", value: "x".repeat(5001) },
+    { field: "genres", value: Array(51).fill("Action") },
+    { field: "excludeTitles", value: Array(501).fill("Manga") },
+    { field: "excludeTitles", value: [42] },
+    { field: "baseMangaIds", value: Array(51).fill(3) },
+    { field: "baseMangaIds", value: [2_147_483_648] },
+    { field: "completionStatus", value: "other" },
+    { field: "chapterLength", value: "other" },
+    { field: "contentRating", value: "other" },
+    { field: "diverge", value: "false" },
+    { field: "page", value: 0 },
+  ])("rejects invalid $field before querying the library or catalog", async ({ field, value }) => {
+    const res = await POST(request({ [field]: value }));
+
+    expect(res.status).toBe(400);
+    expect(findMany).not.toHaveBeenCalled();
+    expect(getCandidatePool).not.toHaveBeenCalled();
+    expect(rankCandidates).not.toHaveBeenCalled();
+  });
+
   it("maps ranked picks back onto the real candidate data", async () => {
     const res = await POST(request());
 

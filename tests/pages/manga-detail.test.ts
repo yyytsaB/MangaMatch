@@ -1,0 +1,36 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const lookup = vi.fn();
+
+vi.mock("@/lib/db", () => ({
+  prisma: { manga: { findUnique: lookup, findFirst: lookup } },
+}));
+vi.mock("next/headers", () => ({
+  cookies: async () => new Map([["mangamatch_session", { value: "reader-a" }]]),
+}));
+
+const { default: MangaDetailPage } = await import("@/app/library/[id]/page");
+
+function renderDetail(id: string) {
+  return MangaDetailPage({ params: Promise.resolve({ id }) });
+}
+
+describe("manga detail page", () => {
+  beforeEach(() => {
+    lookup.mockReset();
+  });
+
+  it("returns not found for an invalid id before querying the library", async () => {
+    await expect(renderDetail("invalid")).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK;404");
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it("returns not found for a title outside the current library", async () => {
+    lookup.mockImplementation(async ({ where }) =>
+      where.sessionId === "reader-a" ? null : { id: 7, title: "Private title" }
+    );
+    await expect(renderDetail("7").then(() => "rendered")).rejects.toThrow(
+      "NEXT_HTTP_ERROR_FALLBACK;404"
+    );
+  });
+});

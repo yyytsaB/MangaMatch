@@ -48,13 +48,13 @@ afterEach(() => {
 });
 
 describe("GET /api/categories", () => {
-  it("lists categories alphabetically with manga counts", async () => {
+  it("lists categories alphabetically with manga counts scoped to the session", async () => {
     const res = await GET(getRequest());
 
     expect(findMany).toHaveBeenCalledWith({
       where: { sessionId: "default" },
       orderBy: { name: "asc" },
-      include: { _count: { select: { manga: true } } },
+      include: { _count: { select: { manga: { where: { sessionId: "default" } } } } },
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({

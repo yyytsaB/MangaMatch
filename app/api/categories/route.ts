@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     const categories = await prisma.category.findMany({
       where: { sessionId },
       orderBy: { name: "asc" },
-      include: { _count: { select: { manga: true } } },
+      include: { _count: { select: { manga: { where: { sessionId } } } } },
     });
     return NextResponse.json({ categories });
   } catch (err) {

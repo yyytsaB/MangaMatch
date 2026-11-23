@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("GET /api/manga/list", () => {
-  it("returns the library newest-first with categories included", async () => {
+  it("returns the library newest-first with categories scoped to the session", async () => {
     findMany.mockResolvedValue([{ id: 2, title: "Newer", categories: [] }]);
 
     const res = await GET(getRequest());
@@ -38,7 +38,7 @@ describe("GET /api/manga/list", () => {
     expect(findMany).toHaveBeenCalledWith({
       where: { sessionId: "default" },
       orderBy: { createdAt: "desc" },
-      include: { categories: true },
+      include: { categories: { where: { sessionId: "default" } } },
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({

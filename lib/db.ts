@@ -1,7 +1,7 @@
 // Prisma client singleton.
 // Supports local SQLite (file:./dev.db) and Turso cloud libSQL (libsql://...) on Vercel.
 import { PrismaClient } from "@prisma/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -17,7 +17,7 @@ function createPrismaClient(): PrismaClient {
     connectionUrl.startsWith("https://") ||
     Boolean(authToken)
   ) {
-    const adapter = new PrismaLibSql({
+    const adapter = new PrismaLibSQL({
       url: connectionUrl,
       authToken: authToken,
     });

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import AmbientBackground from "@/components/AmbientBackground";
 import PageHeader from "@/components/PageHeader";
 import ErrorBanner from "@/components/ErrorBanner";
@@ -519,7 +518,6 @@ export default function RecommendationsPage() {
                 const statusInfo = statusBadge(rec.status);
                 const isAdded = addedTitles.has(rec.title);
                 const mangafireUrl = `https://mangafire.to/browse?keyword=${encodeURIComponent(rec.title)}&sort=relevance:desc`;
-                const comixUrl = `https://comix.to/browse?q=${encodeURIComponent(rec.title)}&sort=relevance%3Adesc`;
 
                 return (
                   <div
@@ -578,7 +576,7 @@ export default function RecommendationsPage() {
                             <span>Why Gemini picks this</span>
                           </div>
                           <p className="text-xs italic leading-relaxed text-[#F5F5F0]">
-                            "{rec.reason}"
+                            &quot;{rec.reason}&quot;
                           </p>
                         </div>
                       </div>
@@ -657,7 +655,7 @@ export default function RecommendationsPage() {
         <Modal title="Mark as Already Read?">
           <div className="mt-2">
             <p className="mb-6 text-sm text-[#8CA0BE] leading-relaxed">
-              Add <span className="font-semibold text-[#F5F5F0]">{confirmingRec.title}</span> to your library as "Completed"?
+              Add <span className="font-semibold text-[#F5F5F0]">{confirmingRec.title}</span> to your library as &quot;Completed&quot;?
             </p>
             <div className="flex gap-3">
               <button

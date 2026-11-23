@@ -22,7 +22,7 @@ async function updateCategoryLink(
   if (!body) {
     return badRequest("Invalid JSON body");
   }
-  const categoryId = parseId(String(body.categoryId));
+  const categoryId = parseId(body.categoryId);
   if (!categoryId) {
     return badRequest("Invalid or missing 'categoryId'");
   }
@@ -38,15 +38,19 @@ async function updateCategoryLink(
       return notFound("Manga not found in current library");
     }
 
-    const link = { id: categoryId };
+    const link = { id: categoryId, sessionId };
+    const category = await prisma.category.findUnique({ where: link });
+    if (!category) {
+      return notFound("Category not found in current library");
+    }
 
     const manga = await prisma.manga.update({
-      where: { id: mangaId },
+      where: { id: mangaId, sessionId },
       data: {
         categories:
           action === "connect" ? { connect: link } : { disconnect: link },
       },
-      include: { categories: true },
+      include: { categories: { where: { sessionId } } },
     });
     return NextResponse.json({ success: true, manga });
   } catch (err) {
