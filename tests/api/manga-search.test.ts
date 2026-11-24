@@ -43,23 +43,13 @@ describe("GET /api/manga/search", () => {
     });
   });
 
-  it("500s with the failure details when the search throws", async () => {
+  it("500s with a plain-language message, keeping vendor errors out of the response", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     searchManga.mockRejectedValue(new Error("AniList API error: 503"));
 
     const res = await GET(request("/api/manga/search?q=x"));
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({
-      details: "AniList API error: 503",
-    });
-  });
-
-  it("reports a generic message for non-Error rejections", async () => {
-    searchManga.mockRejectedValue("weird");
-
-    const res = await GET(request("/api/manga/search?q=x"));
-
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ details: "Unknown error" });
+    expect(await res.json()).toEqual({ error: "Search is unavailable right now. Try again in a moment." });
   });
 });

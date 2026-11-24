@@ -193,6 +193,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ recommendations });
   } catch (err) {
-    return serverError(err, "Failed to generate recommendations", true);
+    return serverError(err, "Couldn’t put your picks together right now. Try again in a moment.");
   }
 }

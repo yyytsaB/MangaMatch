@@ -18,6 +18,6 @@ export async function GET(req: NextRequest) {
     const results = await getBrowseManga(sortParam as BrowseSort, genre);
     return NextResponse.json({ results });
   } catch (err) {
-    return serverError(err, "Failed to fetch manga", true);
+    return serverError(err, "Couldn’t load titles right now. Try again in a moment.");
   }
 }

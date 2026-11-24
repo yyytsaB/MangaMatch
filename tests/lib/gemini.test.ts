@@ -143,12 +143,53 @@ describe("rankCandidates", () => {
     expect(picks).toEqual([{ index: 0, reason: "ok" }]);
   });
 
-  it("throws on a non-OK HTTP response", async () => {
-    fetchMock.mockResolvedValueOnce(geminiResponse("quota exceeded", 429));
+  it("throws on a non-OK HTTP response without retrying it", async () => {
+    fetchMock.mockResolvedValueOnce(geminiResponse("bad request", 400));
 
     await expect(rankCandidates([candidate()], filters())).rejects.toThrow(
-      /Gemini API error: 429 quota exceeded/
+      /Gemini API error: 400 bad request/
     );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("turns off extended thinking so ranking answers in seconds", async () => {
+    await rankCandidates([candidate()], filters());
+
+    const init = fetchMock.mock.calls[0][1];
+    expect(JSON.parse(init.body).generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+  });
+
+  it("retries when the model is briefly overloaded", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock
+        .mockResolvedValueOnce(geminiResponse("high demand", 503))
+        .mockResolvedValueOnce(geminiResponse("rate limited", 429));
+
+      const ranked = rankCandidates([candidate()], filters());
+      await vi.runAllTimersAsync();
+
+      await expect(ranked).resolves.toEqual([{ index: 0, reason: "Fits" }]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives up after a few overloaded attempts", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockResolvedValue(geminiResponse("high demand", 503));
+
+      const ranked = rankCandidates([candidate()], filters());
+      const assertion = expect(ranked).rejects.toThrow(/Gemini API error: 503 high demand/);
+      await vi.runAllTimersAsync();
+
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("throws when the response contains no content", async () => {

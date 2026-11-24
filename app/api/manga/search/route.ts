@@ -15,6 +15,6 @@ export async function GET(req: NextRequest) {
     const results = await searchManga(query);
     return NextResponse.json({ query, results });
   } catch (err) {
-    return serverError(err, "Failed to fetch from AniList API", true);
+    return serverError(err, "Search is unavailable right now. Try again in a moment.");
   }
 }

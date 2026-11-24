@@ -144,6 +144,28 @@ export function buildPrompt(
   return parts.join("\n");
 }
 
+const MAX_ATTEMPTS = 3;
+const TRANSIENT_STATUSES = new Set([429, 500, 503, 504]);
+
+/** Posts a ranking request, retrying brief overload/rate-limit responses. */
+async function postRanking(body: string, apiKey: string): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        signal: AbortSignal.timeout(20_000),
+        body,
+      }
+    );
+    if (res.ok || !TRANSIENT_STATUSES.has(res.status) || attempt >= MAX_ATTEMPTS) return res;
+    await res.text().catch(() => ""); // release the connection
+    // Overload spikes are short; back off briefly before trying again.
+    await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
+  }
+}
+
 export async function rankCandidates(
   candidates: CandidateManga[],
   filters: RankingFilters
@@ -153,31 +175,26 @@ export async function rankCandidates(
     throw new Error("GEMINI_API_KEY is not set in environment variables");
   }
 
-  const prompt = buildPrompt(candidates, filters);
-
-  const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      signal: AbortSignal.timeout(20_000),
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "ARRAY",
-            maxItems: 5,
-            items: {
-              type: "OBJECT",
-              properties: { index: { type: "INTEGER" }, reason: { type: "STRING" } },
-              required: ["index", "reason"],
-            },
-          },
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: buildPrompt(candidates, filters) }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "ARRAY",
+        maxItems: 5,
+        items: {
+          type: "OBJECT",
+          properties: { index: { type: "INTEGER" }, reason: { type: "STRING" } },
+          required: ["index", "reason"],
         },
-      }),
-    }
-  );
+      },
+      // Picking 5 of 25 doesn't need extended reasoning; with it on,
+      // a ranking takes ~30s and overruns the deadline.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+
+  const res = await postRanking(body, apiKey);
 
   if (!res.ok) {
     const errText = await res.text();

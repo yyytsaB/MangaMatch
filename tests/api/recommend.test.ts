@@ -485,24 +485,27 @@ describe("POST /api/recommend", () => {
     });
   });
 
-  it("500s with the failure details when ranking throws", async () => {
-    rankCandidates.mockRejectedValue(new Error("Gemini API error: 429"));
+  it("500s with a plain-language message, keeping vendor errors out of the response", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    rankCandidates.mockRejectedValue(new Error("Gemini API error: 503 high demand"));
 
     const res = await POST(request());
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({
-      error: "Failed to generate recommendations",
-      details: "Gemini API error: 429",
+      error: "Couldn’t put your picks together right now. Try again in a moment.",
     });
   });
 
-  it("reports a generic message for non-Error failures", async () => {
+  it("uses the same message for non-Error failures", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     getCandidatePool.mockRejectedValue("nope");
 
     const res = await POST(request());
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ details: "Unknown error" });
+    expect(await res.json()).toEqual({
+      error: "Couldn’t put your picks together right now. Try again in a moment.",
+    });
   });
 });

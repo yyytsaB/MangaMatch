@@ -53,23 +53,13 @@ describe("GET /api/manga/trending", () => {
     expect(getBrowseManga).not.toHaveBeenCalled();
   });
 
-  it("500s with details when the upstream fetch fails", async () => {
-    getBrowseManga.mockRejectedValue(new Error("boom"));
+  it("500s with a plain-language message, keeping upstream errors out of the response", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getBrowseManga.mockRejectedValue(new Error("AniList API error: 503"));
 
     const res = await GET(request("/api/manga/trending"));
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({
-      error: "Failed to fetch manga",
-      details: "boom",
-    });
-  });
-
-  it("reports a generic message for non-Error rejections", async () => {
-    getBrowseManga.mockRejectedValue({ nope: true });
-
-    const res = await GET(request("/api/manga/trending"));
-
-    expect(await res.json()).toMatchObject({ details: "Unknown error" });
+    expect(await res.json()).toEqual({ error: "Couldn’t load titles right now. Try again in a moment." });
   });
 });
